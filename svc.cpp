@@ -263,7 +263,7 @@ int main(int argc, char* argv[])
 		exit(CODE_WRONG_OPTIONS);
 	if (config.daemonize) {
         char wd[PATH_MAX];
-        std::string currentPath = getcwd(wd, PATH_MAX);
+		std::string currentPath(getcwd(wd, PATH_MAX));
 		if (config.verbosity)
 			std::cerr << _("Start as daemon, use syslog") << std::endl;
         OPEN_SYSLOG(progname)
