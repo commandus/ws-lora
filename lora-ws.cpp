@@ -69,7 +69,7 @@ typedef enum {
 const static char *MSG_HTTP_ERROR = "Error";
 const static char *MSG404 = "404 not found";
 const static char *MSG401 = "Unauthorized";
-const static char *MSG501 = "Not immplemented";
+const static char *MSG501 = "Not implemented";
 
 const static char *MSG500[5] = {
 	"",                                     // 0

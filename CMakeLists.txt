@@ -22,6 +22,13 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 	set (OS_SPECIFIC_LIBS wsock32 ws2_32 Userenv)
 endif()
 
-add_executable(lora-ws third-party/daemonize.cpp svc.cpp lora-ws.cpp ws-config.cpp ${ARGTABLE})
+add_executable(lora-ws
+	third-party/daemonize.cpp
+	svc.cpp
+	lora-ws.cpp
+	query-parser-json.cpp
+	ws-config.cpp
+	${ARGTABLE}
+)
 target_link_libraries(lora-ws PRIVATE ${OS_SPECIFIC_LIBS} ${LIBMICROHTTPD})
 target_include_directories(lora-ws PRIVATE "third-party" "." ${VCPKG_INC})
