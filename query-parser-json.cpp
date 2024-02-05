@@ -24,12 +24,12 @@ public:
     }
 
     bool number_integer(number_integer_t val) override {
-        params->back() = val;
+        params->back() = (long) val;
         return true;
     }
 
     bool number_unsigned(number_unsigned_t val) override {
-        params->back() = val;
+        params->back() = (unsigned long) val;
         return true;
     }
 
