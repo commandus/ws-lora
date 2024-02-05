@@ -1,15 +1,10 @@
-/* 
- * web service
- * Usage:
- * ./ws-lora
- */
-
 #include <string>
+#include <cstring>
 #include <iostream>
 #include <sstream>
-
 #include <csignal>
 #include <cstdlib>
+
 #include <argtable3/argtable3.h>
 
 #include "daemonize.h"
@@ -21,6 +16,7 @@
 #define sleep Sleep
 #define DEF_WAIT 1000
 #else
+#include <linux/limits.h>
 #define DEF_WAIT 1
 #endif
 
@@ -101,7 +97,7 @@ static void runHttpJson(
     if (!startWS(wsConfig)) {
         std::stringstream ss;
         ss << "Can not start web service errno "
-            << errno << ": " << strerror(errno)
+            << errno << ": " << std::strerror(errno)
             << ". libmicrohttpd version " << std::hex << MHD_VERSION;
 		if (asDaemon) {
 			SYSLOG(LOG_ALERT, ss.str().c_str());
