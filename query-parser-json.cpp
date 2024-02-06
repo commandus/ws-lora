@@ -83,3 +83,12 @@ int QueryParserJson::parse(
     nlohmann::json::sax_parse(json, json + size, &consumer);
     return consumer.parseError;
 }
+
+int QueryParserJson::parse(
+    std::vector <QueryParam> *params,
+    const std::string &json
+) {
+    SaxQuery consumer(params);
+    nlohmann::json::sax_parse(json, &consumer);
+    return consumer.parseError;
+}

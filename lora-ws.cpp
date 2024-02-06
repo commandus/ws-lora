@@ -1,17 +1,16 @@
-#include <cstdlib>
+#include <string>
 #include <cstring>
-#include <cstdio>
-
-#include <sstream>
-#include <algorithm>
 #include <functional>
 
-#include <sys/stat.h>
 #include <microhttpd.h>
+#include <sstream>
+
+#include "lorawan/lorawan-string.h"
+#include "base64/base64.h"
 
 static const std::string VERSION_STR("1.0");
 
-// Caution: version may be different, if microhttpd dependecy not compiled, revise version humber
+// Caution: version may be different, if microhttpd dependency not compiled, revise version humber
 #if MHD_VERSION <= 0x00096600
 #define MHD_Result int
 #endif
@@ -31,6 +30,7 @@ static const std::string VERSION_STR("1.0");
 #define MODULE_WS	200
 
 #include "lora-ws.h"
+#include "lorawan/lorawan-conv.h"
 
 #define PATH_COUNT 2
 
@@ -96,8 +96,94 @@ void *uri_logger_callback(void *cls, const char *uri)
 
 const char *NULLSTR = "";
 
+static void jsInvalidParametersCount(
+    std::ostream &retVal,
+    const std::vector<QueryParam> &params
+) {
+    retVal << "{\"code\": -5001, \"error\": \"Invalid parameters\", \"count\": " << params.size() << "}";
+}
+
+static void jsInvalidParameterValue(
+    std::ostream &retVal
+) {
+    retVal << "{\"code\": -5002, \"error\": \"Invalid parameter value\"}";
+}
+
+static void jsVersion(
+    std::ostream &retval
+)
+{
+    retval << "{\"version\": \"" << VERSION_STR << "\"}";
+}
+
+static void jsNetId(
+    std::ostream &retVal,
+    const DEVADDR &addr
+) {
+    NETID nid(addr.getNwkId());
+    DEVADDR minAddr(nid, false);
+    DEVADDR maxAddr(nid, true);
+
+    retVal
+        << "{\"addr\": \"" << DEVADDR2string(addr)
+            << "\", \"netid\": \"" << nid.toString()
+            << "\", \"type\": \"" << std::hex << (int) nid.getType()
+            << "\", \"id\": \"" << std::hex << nid.getNetId()
+            << "\", \"nwkId\": \"" << std::hex << nid.getNwkId()
+            << "\", \"addrMin\": \"" << minAddr.toString()
+            << "\", \"addrMax\": \"" << maxAddr.toString()
+            << "\"}";
+}
+
+static void jsRfm(
+    std::ostream &retVal,
+    std::string &value
+) {
+    RFM_HEADER *rfm = (RFM_HEADER *) value.c_str();
+    size_t sz = value.size();
+    if (sz < SIZE_RFM_HEADER) {
+        jsInvalidParameterValue(retVal);
+        return;
+    }
+    ntoh_RFM_HEADER(rfm);
+
+    retVal
+        << "{\"mhdr\": {"
+        << "{\"mtype\": \"" << mtype2string((MTYPE) rfm->macheader.f.mtype)
+        << "\", \"major\": " << (int) rfm->macheader.f.major
+        << ", \"rfu\": " << (int) rfm->macheader.f.rfu
+        << "}, \"addr\": \"" << DEVADDR2string(rfm->devaddr)
+        << "\", \"fctrl\": {\"foptslen\": "
+        << (unsigned int) rfm->fctrl.f.foptslen;
+    if ((rfm->macheader.f.mtype == MTYPE_UNCONFIRMED_DATA_DOWN) || (rfm->macheader.f.mtype == MTYPE_CONFIRMED_DATA_DOWN)) {
+        retVal << ", \"pending\": " << ((unsigned int) rfm->fctrl.f.fpending == 0 ? "false": "true");
+    }
+    if ((rfm->macheader.f.mtype == MTYPE_UNCONFIRMED_DATA_UP) || (rfm->macheader.f.mtype == MTYPE_CONFIRMED_DATA_UP)) {
+        retVal << ", \"classB\": " << ((unsigned int) rfm->fctrl.fup.classb == 0 ? "false": "true")
+            << (rfm->fctrl.fup.addrackreq == 0 ? "false" : "true");
+    }
+    retVal << ", \"ack\": " << ((unsigned int) rfm->fctrl.f.ack == 0 ? "false": "true")
+        << ", \"adr\": " << (rfm->fctrl.f.adr == 0 ? "false" : "true")
+        << "}, \"fcnt\": "  << rfm->fcnt;
+
+    if (rfm->fctrl.f.foptslen && sz - SIZE_RFM_HEADER > rfm->fctrl.f.foptslen) {
+        retVal << ", \"mac\": \"" << hexString((value.c_str() + SIZE_RFM_HEADER), rfm->fctrl.f.foptslen)
+               << "\"";
+    }
+
+    if (sz < SIZE_RFM_HEADER + rfm->fctrl.f.foptslen)
+        return; // no FPort, no FRMPayload
+
+    std::string payload = std::string(value.c_str() + SIZE_RFM_HEADER + rfm->fctrl.f.foptslen + 1,
+                                      sz - SIZE_RFM_HEADER - rfm->fctrl.f.foptslen - 1);
+
+    retVal << ", \"fport\": " << (unsigned int) *((uint8_t*) value.c_str() + SIZE_RFM_HEADER + rfm->fctrl.f.foptslen)
+        << ", \"payload\": \"" << hexString(payload)
+        << "\"}";
+}
+
 static bool fetchJson(
-    std::string &retval,
+    std::ostream &retVal,
 	struct MHD_Connection *connection,
     const WSConfig *config,
 	const RequestContext *env
@@ -106,10 +192,41 @@ static bool fetchJson(
     // grpc::ServerContext svcContext;
 	switch (env->requestType) {
         case RequestType::REQUEST_TYPE_VERSION:
-            retval = "{\"version\": \"" + VERSION_STR + "\"}";;
+            jsVersion(retVal);
             break;
         case RequestType::REQUEST_TYPE_CLAUSE:
-            retval = "{\"postdata\": \"" + env->postData + "\"}";
+        {
+            std::vector<QueryParam> params;
+            config->queryParserJson.parse(&params, env->postData);
+            if (params.empty())
+                retVal << "{}";
+            const std::string &f = params[0].s;
+            if (f == "netid") {
+                if (params.size() < 2)
+                    jsInvalidParametersCount(retVal, params);
+                // extract the network identifier from the address
+                DEVADDR a;
+                string2DEVADDR(a, params[1].s);
+                jsNetId(retVal, a);
+            } else
+                if (f == "rfm") {
+                    if (params.size() < 2)
+                        jsInvalidParametersCount(retVal, params);
+                    bool isBase64 = false;
+                    if (params.size() > 2)
+                        isBase64 = params[2].b;
+                    std::string s;
+                    if (isBase64)
+                        s = base64_decode(params[1].s, true);
+                    else
+                        s = hex2string(params[1].s);
+                    jsRfm(retVal, s);
+                } else
+                    if (f == "version")
+                        jsVersion(retVal);
+                    else
+                        retVal << "{}";
+        }
             break;
         default:
             return false;
@@ -206,14 +323,15 @@ static MHD_Result request_callback(
         response = MHD_create_response_from_buffer(strlen(MSG501), (void *) MSG501, MHD_RESPMEM_PERSISTENT);
     } else {
         // Service
-        std::string json;
+        std::stringstream json;
         bool r = fetchJson(json, connection, (WSConfig*) cls, requestCtx);
         if (!r) {
             hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
             response = MHD_create_response_from_buffer(strlen(MSG500[r]), (void *) MSG500[r], MHD_RESPMEM_PERSISTENT);
         } else {
             hc = MHD_HTTP_OK;
-            response = MHD_create_response_from_buffer(json.size(), (void *) json.c_str(), MHD_RESPMEM_MUST_COPY);
+            std::string js = json.str();
+            response = MHD_create_response_from_buffer(js.size(), (void *) js.c_str(), MHD_RESPMEM_MUST_COPY);
         }
     }
     MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);

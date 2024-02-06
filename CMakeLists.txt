@@ -14,21 +14,33 @@ set(CMAKE_CXX_STANDARD 11)
 find_library(LIBMICROHTTPD NAMES microhttpd libmicrohttpd-dll.lib HINTS /usr/lib/x86_64-linux-gnu/ ${VCPKG_LIB})
 
 set(ARGTABLE "third-party/argtable3/argtable3.c")
+set(LORAWAN_SRC
+	lorawan/lorawan-conv.cpp
+	lorawan/lorawan-error.cpp
+	lorawan/lorawan-msg.cpp
+	lorawan/lorawan-string.cpp
+	lorawan/lorawan-date.cpp
+	lorawan/lorawan-mac.cpp
+	lorawan/lorawan-packet-storage.cpp
+	lorawan/lorawan-types.cpp
+)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 	# avoid Error LNK2038 mismatch detected for 'RuntimeLibrary': value 'MT_StaticRelease' doesn't match value 'MD_DynamicRelease'
 	# set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 	# set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-	set (OS_SPECIFIC_LIBS wsock32 ws2_32 Userenv)
+	set(OS_SPECIFIC_LIBS wsock32 ws2_32 Userenv)
 endif()
 
 add_executable(lora-ws
-	third-party/daemonize.cpp
 	svc.cpp
 	lora-ws.cpp
 	query-parser-json.cpp
 	ws-config.cpp
+	${LORAWAN_SRC}
 	${ARGTABLE}
+	third-party/daemonize.cpp
+	third-party/base64/base64.cpp
 )
 target_link_libraries(lora-ws PRIVATE ${OS_SPECIFIC_LIBS} ${LIBMICROHTTPD})
-target_include_directories(lora-ws PRIVATE "third-party" "." ${VCPKG_INC})
+target_include_directories(lora-ws PRIVATE "." "third-party" ${VCPKG_INC})

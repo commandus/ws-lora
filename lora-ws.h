@@ -8,6 +8,8 @@
 #include <map>
 #include <string>
 
+#include "query-parser-json.h"
+
 #define MHD_START_FLAGS 	MHD_USE_POLL | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK | MHD_USE_TCP_FASTOPEN | MHD_USE_TURBO
 
 #define NUMBER_OF_THREADS CPU_COUNT
@@ -15,9 +17,10 @@
 /**
  * Configuration to start up web service
  */
-typedef struct {
-	unsigned int threadCount;
-	unsigned int connectionLimit;
+class WSConfig {
+public:
+	size_t threadCount;
+    size_t connectionLimit;
 	unsigned int flags;
 
 	// listener port
@@ -30,7 +33,9 @@ typedef struct {
 	int verbosity;
 	// web server descriptor
 	void *descriptor;
-} WSConfig;
+    //
+    QueryParserJson queryParserJson;
+};
 
 /**
  * @param threadCount threads count, e.g. 2

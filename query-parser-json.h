@@ -70,6 +70,10 @@ public:
         const char *json,
         size_t size
     );
+    static int parse(
+        std::vector <QueryParam> *params,
+        const std::string &value
+    );
 };
 
 #endif

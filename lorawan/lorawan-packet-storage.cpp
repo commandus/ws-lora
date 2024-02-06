@@ -1,0 +1,99 @@
+#include <cstring>
+#include <stdexcept>
+
+#include "lorawan/lorawan-packet-storage.h"
+#include "lorawan/lorawan-string.h"
+
+#include "base64/base64.h"
+
+LORAWAN_MESSAGE_STORAGE::LORAWAN_MESSAGE_STORAGE()
+    : data {}
+{
+}
+
+LORAWAN_MESSAGE_STORAGE::LORAWAN_MESSAGE_STORAGE(
+    const std::string &base64string
+)
+    : data {}
+{
+    decodeBase64ToLORAWAN_MESSAGE_STORAGE(*this, base64string);
+}
+
+bool decodeBase64ToLORAWAN_MESSAGE_STORAGE(
+    LORAWAN_MESSAGE_STORAGE &retVal,
+    const std::string &base64string
+)
+{
+    try {
+        std::string s = base64_decode(base64string);
+        size_t sz = s.size();
+        if (sz > sizeof(LORAWAN_MESSAGE_STORAGE) - 2)
+            sz = sizeof(LORAWAN_MESSAGE_STORAGE) - 2;
+        memmove(&retVal.mhdr, s.c_str(), sz);
+        retVal.packetSize = (uint16_t) sz;
+    } catch (std::runtime_error e) {
+        return false;
+    }
+    return true;
+}
+
+std::string LORAWAN_MESSAGE_STORAGE::toString() const
+{
+    return MHDR2String(this->mhdr);
+}
+
+const DEVADDR* LORAWAN_MESSAGE_STORAGE::getAddr() const
+{
+    if (mhdr.f.mtype >= MTYPE_UNCONFIRMED_DATA_UP
+        && mhdr.f.mtype <= MTYPE_CONFIRMED_DATA_DOWN) {
+        return &data.downlink.devaddr;
+    }
+    return nullptr;
+}
+
+const JOIN_REQUEST_FRAME *LORAWAN_MESSAGE_STORAGE::getJoinRequest() const
+{
+    if (mhdr.f.mtype == MTYPE_JOIN_REQUEST)
+        return &data.joinRequest;
+    return nullptr;
+}
+
+bool LORAWAN_MESSAGE_STORAGE::operator==(const LORAWAN_MESSAGE_STORAGE &rhs) const
+{
+    if (rhs.mhdr != mhdr)
+        return false;
+    switch(rhs.mhdr.f.mtype) {
+        case MTYPE_JOIN_REQUEST:
+            return rhs.data.joinRequest == data.joinRequest;
+        case MTYPE_JOIN_ACCEPT:
+            return rhs.data.joinResponse == data.joinResponse;
+        case MTYPE_UNCONFIRMED_DATA_UP:
+            return rhs.data.uplink == data.uplink;
+        case MTYPE_UNCONFIRMED_DATA_DOWN:
+            return rhs.data.downlink == data.downlink;
+        case MTYPE_CONFIRMED_DATA_UP:
+            return rhs.data.uplink == data.uplink;
+        case MTYPE_CONFIRMED_DATA_DOWN:
+            return rhs.data.downlink == data.downlink;
+        case MTYPE_REJOIN_REQUEST:
+            return false;
+        case MTYPE_PROPRIETARYRADIO:
+            return false;
+        default:
+            return false;
+    }
+}
+
+bool UPLINK_STORAGE::operator==(
+    const UPLINK_STORAGE &rhs
+) const
+{
+    return memcmp(this, &rhs, SIZE_UPLINK_STORAGE);
+}
+
+bool DOWNLINK_STORAGE::operator==(
+    const DOWNLINK_STORAGE &rhs
+) const
+{
+    return memcmp(this, &rhs, SIZE_DOWNLINK_STORAGE);
+}
