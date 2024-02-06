@@ -124,15 +124,20 @@ static void jsNetId(
     DEVADDR minAddr(nid, false);
     DEVADDR maxAddr(nid, true);
 
-    retVal
-        << "{\"addr\": \"" << DEVADDR2string(addr)
-            << "\", \"netid\": \"" << nid.toString()
-            << "\", \"type\": \"" << std::hex << (int) nid.getType()
-            << "\", \"id\": \"" << std::hex << nid.getNetId()
-            << "\", \"nwkId\": \"" << std::hex << nid.getNwkId()
-            << "\", \"addrMin\": \"" << minAddr.toString()
-            << "\", \"addrMax\": \"" << maxAddr.toString()
-            << "\"}";
+    retVal << "{\"addr\": \"" << DEVADDR2string(addr)
+        << "\", \"netid\": \"" << nid.toString()
+        << "\", \"type\": \"" << std::hex << (int) nid.getType()
+        << "\", \"id\": \"" << std::hex << nid.getNetId()
+        << "\", \"nwkId\": \"" << std::hex << nid.getNwkId()
+        << "\", \"addrMin\": \"" << minAddr.toString()
+        << "\", \"addrMax\": \"" << maxAddr.toString()
+        << "\"}";
+}
+
+static void jsGw(
+    std::ostream &retVal,
+    const std::string &value
+) {
 }
 
 static void jsRfm(
@@ -146,10 +151,8 @@ static void jsRfm(
         return;
     }
     ntoh_RFM_HEADER(rfm);
-
     retVal
-        << "{\"mhdr\": {"
-        << "{\"mtype\": \"" << mtype2string((MTYPE) rfm->macheader.f.mtype)
+        << "{\"mhdr\": {\"mtype\": \"" << mtype2string((MTYPE) rfm->macheader.f.mtype)
         << "\", \"major\": " << (int) rfm->macheader.f.major
         << ", \"rfu\": " << (int) rfm->macheader.f.rfu
         << "}, \"addr\": \"" << DEVADDR2string(rfm->devaddr)
@@ -160,7 +163,7 @@ static void jsRfm(
     }
     if ((rfm->macheader.f.mtype == MTYPE_UNCONFIRMED_DATA_UP) || (rfm->macheader.f.mtype == MTYPE_CONFIRMED_DATA_UP)) {
         retVal << ", \"classB\": " << ((unsigned int) rfm->fctrl.fup.classb == 0 ? "false": "true")
-            << (rfm->fctrl.fup.addrackreq == 0 ? "false" : "true");
+            << ", \"addrackreq\": " << (rfm->fctrl.fup.addrackreq == 0 ? "false" : "true");
     }
     retVal << ", \"ack\": " << ((unsigned int) rfm->fctrl.f.ack == 0 ? "false": "true")
         << ", \"adr\": " << (rfm->fctrl.f.adr == 0 ? "false" : "true")
@@ -170,16 +173,33 @@ static void jsRfm(
         retVal << ", \"mac\": \"" << hexString((value.c_str() + SIZE_RFM_HEADER), rfm->fctrl.f.foptslen)
                << "\"";
     }
-
     if (sz < SIZE_RFM_HEADER + rfm->fctrl.f.foptslen)
         return; // no FPort, no FRMPayload
-
     std::string payload = std::string(value.c_str() + SIZE_RFM_HEADER + rfm->fctrl.f.foptslen + 1,
                                       sz - SIZE_RFM_HEADER - rfm->fctrl.f.foptslen - 1);
-
     retVal << ", \"fport\": " << (unsigned int) *((uint8_t*) value.c_str() + SIZE_RFM_HEADER + rfm->fctrl.f.foptslen)
         << ", \"payload\": \"" << hexString(payload)
         << "\"}";
+}
+
+static void jsKeyGen(
+    std::ostream &ostream,
+    const std::string &magicKey,
+    const DEVADDR &devaddr
+) {
+    // generate EUI
+    uint8_t eui[8];
+    euiGen(eui, KEY_NUMBER_EUI, phraseKey, addr);
+    strm << std::setw(8) << std::hex << addr << " ";
+    strm << std::hex << std::setw(16) << hexString(eui, 8)  << " ";
+
+    for (int i = KEY_NUMBER_NWK; i <= KEY_NUMBER_APP; i++) {
+        uint8_t key[16];
+        keyGen(key, i, phraseKey, addr);
+        strm << std::hex << std::setw(32) << hexString(key, 16)  << " ";
+    }
+    strm << " " << masterkey << std::endl;
+}
 }
 
 static bool fetchJson(
@@ -194,7 +214,7 @@ static bool fetchJson(
         case RequestType::REQUEST_TYPE_VERSION:
             jsVersion(retVal);
             break;
-        case RequestType::REQUEST_TYPE_CLAUSE:
+        default:
         {
             std::vector<QueryParam> params;
             config->queryParserJson.parse(&params, env->postData);
@@ -202,16 +222,20 @@ static bool fetchJson(
                 retVal << "{}";
             const std::string &f = params[0].s;
             if (f == "netid") {
-                if (params.size() < 2)
+                if (params.size() < 2) {
                     jsInvalidParametersCount(retVal, params);
+                    return true;
+                }
                 // extract the network identifier from the address
                 DEVADDR a;
                 string2DEVADDR(a, params[1].s);
                 jsNetId(retVal, a);
             } else
                 if (f == "rfm") {
-                    if (params.size() < 2)
+                    if (params.size() < 2) {
                         jsInvalidParametersCount(retVal, params);
+                        return true;
+                    }
                     bool isBase64 = false;
                     if (params.size() > 2)
                         isBase64 = params[2].b;
@@ -222,14 +246,36 @@ static bool fetchJson(
                         s = hex2string(params[1].s);
                     jsRfm(retVal, s);
                 } else
-                    if (f == "version")
-                        jsVersion(retVal);
-                    else
-                        retVal << "{}";
+                    if (f == "gw") {
+                        if (params.size() < 2) {
+                            jsInvalidParametersCount(retVal, params);
+                            return true;
+                        }
+                        bool isBase64 = false;
+                        if (params.size() > 2)
+                            isBase64 = params[2].b;
+                        std::string s;
+                        if (isBase64)
+                            s = base64_decode(params[1].s, true);
+                        else
+                            s = hex2string(params[1].s);
+                        jsGw(retVal, s);
+                    } else
+                        if (f == "keygen") {
+                            if (params.size() < 3) {
+                                jsInvalidParametersCount(retVal, params);
+                                return true;
+                            }
+                            DEVADDR a;
+                            string2DEVADDR(a, params[1].s);
+                            jsKeyGen(retVal, params[1].s, a);
+                        } else
+                            if (f == "version")
+                                jsVersion(retVal);
+                            else
+                                retVal << "{}";
         }
             break;
-        default:
-            return false;
     }
 	return true;
 }

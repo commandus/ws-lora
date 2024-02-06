@@ -7,11 +7,16 @@ public:
     int parseError;
     std::vector <QueryParam> *params;
 
+    QueryParam& next() {
+        QueryParam p;
+        params->emplace_back(p);
+        return *(params->end() - 2);
+    }
+
     explicit SaxQuery(std::vector <QueryParam> *aParams)
         : parseError(0), params(aParams)
     {
-        QueryParam p;
-        params->emplace_back();
+        next();
     }
 
     bool null() override {
@@ -19,27 +24,27 @@ public:
     }
 
     bool boolean(bool val) override {
-        params->back() = val;
+        next() = val;
         return true;
     }
 
     bool number_integer(number_integer_t val) override {
-        params->back() = (long) val;
+        next() = (long) val;
         return true;
     }
 
     bool number_unsigned(number_unsigned_t val) override {
-        params->back() = (unsigned long) val;
+        next() = (unsigned long) val;
         return true;
     }
 
     bool number_float(number_float_t val, const string_t &s) override {
-        params->back() = val;
+        next() = val;
         return true;
     }
 
     bool string(string_t &val) override {
-        params->back() = val;
+        next() = val;
         return true;
     }
 
@@ -90,5 +95,6 @@ int QueryParserJson::parse(
 ) {
     SaxQuery consumer(params);
     nlohmann::json::sax_parse(json, &consumer);
+    params->resize(params->size() - 1);
     return consumer.parseError;
 }

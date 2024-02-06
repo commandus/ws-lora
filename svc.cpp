@@ -144,12 +144,7 @@ int parseCmd(
 	struct arg_lit *a_help = arg_lit0("h", "help", _("Show this help"));
 	struct arg_end *a_end = arg_end(20);
 
-	void* argtable[] = { a_interface, a_port,
-        a_http_json_port,
-        a_daemonize,
-        a_verbosity,
-        a_help, a_end
-    };
+	void* argtable[] = { a_interface, a_port, a_http_json_port, a_daemonize, a_verbosity, a_help, a_end };
 
 	int nerrors;
 
