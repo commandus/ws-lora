@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "lorawan/lorawan-string.h"
+#include "lorawan/key/key128gen.h"
 #include "base64/base64.h"
 
 static const std::string VERSION_STR("1.0");
@@ -183,23 +184,26 @@ static void jsRfm(
 }
 
 static void jsKeyGen(
-    std::ostream &ostream,
-    const std::string &magicKey,
-    const DEVADDR &devaddr
+    std::ostream &retVal,
+    const std::string &masterKey,
+    const DEVADDR &addr
 ) {
-    // generate EUI
-    uint8_t eui[8];
-    euiGen(eui, KEY_NUMBER_EUI, phraseKey, addr);
-    strm << std::setw(8) << std::hex << addr << " ";
-    strm << std::hex << std::setw(16) << hexString(eui, 8)  << " ";
+    // generate "master key" by the passphrase
+    KEY128 phraseKey;
+    phrase2key(phraseKey, masterKey.c_str(), masterKey.size());
 
-    for (int i = KEY_NUMBER_NWK; i <= KEY_NUMBER_APP; i++) {
-        uint8_t key[16];
-        keyGen(key, i, phraseKey, addr);
-        strm << std::hex << std::setw(32) << hexString(key, 16)  << " ";
-    }
-    strm << " " << masterkey << std::endl;
-}
+    // generate EUI
+    DEVEUI eui;
+    euiGen(eui, KEY_NUMBER_EUI, phraseKey, addr);
+    KEY128 nwkKey;
+    keyGen(nwkKey, KEY_NUMBER_NWK, phraseKey, addr);
+    KEY128 appKey;
+    keyGen(appKey, KEY_NUMBER_APP, phraseKey, addr);
+    retVal << "{\"addr\": \"" << DEVADDR2string(addr)
+        << "\", \"eui\": \"" << DEVEUI2string(eui)
+        << "\", \"nwkKey\": \"" << KEY2string(nwkKey)
+        << "\", \"appKey\": \"" << KEY2string(appKey)
+        << "\"}";
 }
 
 static bool fetchJson(

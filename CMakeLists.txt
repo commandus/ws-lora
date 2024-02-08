@@ -23,6 +23,8 @@ set(LORAWAN_SRC
 	lorawan/lorawan-mac.cpp
 	lorawan/lorawan-packet-storage.cpp
 	lorawan/lorawan-types.cpp
+	lorawan/key/key128gen.cpp
+	third-party/system/crypto/aes.c third-party/system/crypto/cmac.c
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
