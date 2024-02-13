@@ -24,6 +24,9 @@ static const std::string VERSION_STR("1.0");
 #ifndef MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS "Access-Control-Allow-Headers"
 #endif
+#ifndef MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN
+#define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
+#endif
 
 #define	LOG_ERR								3
 #define	LOG_INFO							5
@@ -59,7 +62,7 @@ const static char *CT_JSON = "text/javascript;charset=UTF-8";
 const static char *HDR_CORS_ORIGIN = "*";
 const static char *HDR_CORS_CREDENTIALS = "true";
 const static char *HDR_CORS_METHODS = "GET,HEAD,OPTIONS,POST,PUT,DELETE";
-const static char *HDR_CORS_HEADERS = "Authorization, Access-Control-Allow-Headers, "
+const static char *HDR_CORS_HEADERS = "Authorization, Access-Control-Allow-Headers, Access-Control-Allow-Origin, "
     "Origin, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers";
 
 typedef enum {
@@ -286,7 +289,7 @@ static bool fetchJson(
 
 static void addCORS(MHD_Response *response) {
     MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, HDR_CORS_ORIGIN);
-    MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS, HDR_CORS_CREDENTIALS);
+    // MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS, HDR_CORS_CREDENTIALS);
     MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS, HDR_CORS_METHODS);
     MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS, HDR_CORS_HEADERS);
 }
