@@ -1,6 +1,7 @@
 #include <string>
 #include <cstring>
 #include <functional>
+#include <bitset>
 
 #include <microhttpd.h>
 #include <sstream>
@@ -120,6 +121,38 @@ static void jsVersion(
     retval << "{\"version\": \"" << VERSION_STR << "\"}";
 }
 
+static std::string addr2bin(
+    const DEVADDR &value
+)
+{
+    std::stringstream r;
+    r
+        << std::bitset<8>{value.c[3]}.to_string()
+        << std::bitset<8>{value.c[2]}.to_string()
+        << std::bitset<8>{value.c[1]}.to_string()
+        << std::bitset<8>{value.c[0]}.to_string();
+    return r.str();    
+}
+
+static void addrBitExplanation(
+    std::ostream &retVal,
+    const DEVADDR &value,
+    const std::string &prefix = ""
+)
+{
+    std::stringstream ss;
+    uint8_t typ = value.getNetIdType();
+    uint8_t prefixLen = DEVADDR::getTypePrefixBitsCount(typ);
+    uint8_t nwkIdLen = DEVADDR::getNwkIdBitsCount(typ);
+    uint8_t nwkAddrLen = DEVADDR::getNwkAddrBitsCount(typ);
+
+    retVal
+        << "\"" << prefix << "binary\": \"" << addr2bin(value)
+        << "\",\"" << prefix << "prefixlen\": " << (int) prefixLen
+        << ",\"" << prefix << "nwkidlen\": " << (int) nwkIdLen
+        << ",\"" << prefix << "addrlen\": " << (int) nwkAddrLen;
+}
+
 static void jsNetId(
     std::ostream &retVal,
     const DEVADDR &addr
@@ -133,9 +166,17 @@ static void jsNetId(
         << "\", \"type\": \"" << std::hex << (int) nid.getType()
         << "\", \"id\": \"" << std::hex << nid.getNetId()
         << "\", \"nwkId\": \"" << std::hex << nid.getNwkId()
-        << "\", \"addrMin\": \"" << minAddr.toString()
-        << "\", \"addrMax\": \"" << maxAddr.toString()
-        << "\"}";
+        << "\", " << std::dec;
+    addrBitExplanation(retVal, addr);
+    retVal
+        << std::hex << ", \"addrMin\": \"" << minAddr.toString()
+        << "\", " << std::dec;
+    addrBitExplanation(retVal, minAddr, "min");
+    retVal
+        << std::hex << ", \"addrMax\": \"" << maxAddr.toString()
+        << "\", " << std::dec;
+    addrBitExplanation(retVal, maxAddr, "max");
+    retVal << "}";
 }
 
 static void jsGw(
@@ -209,6 +250,94 @@ static void jsKeyGen(
         << "\"}";
 }
 
+static void printClass
+(
+    std::ostream &retVal,
+    const NETID &netid
+) {
+    DEVADDR minAddr(netid, false);
+    DEVADDR maxAddr(netid, true);
+    retVal
+        << "{\"netid\": \"" << netid.toString()
+        << "\", \"type\": \"" << std::hex << (int) netid.getType()
+        << "\", \"id\": \"" << netid.getNetId()
+        << "\", \"nwkid\": \"" << netid.getNwkId()
+        << "\", \"addrmin\": \"" << minAddr.toString()
+        << "\", " << std::dec;
+    addrBitExplanation(retVal, minAddr, "min");
+    retVal
+        << std::hex << ", \"addrmax\": \"" << maxAddr.toString()
+        << "\", " << std::dec;
+    addrBitExplanation(retVal, minAddr, "max");
+    retVal
+        << "}";
+}
+
+static void jsAllClasses(
+    std::ostream &retVal
+) {
+    NETID netid;
+    // print header
+    retVal 
+        << "[";
+        
+    netid.set(0, 0);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    netid.set(0, (1 << 6) - 1);
+    printClass(retVal, netid);
+    retVal << ", \n";
+
+    netid.set(1, 0);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    netid.set(1, (1 << 6) - 1);
+    printClass(retVal, netid);
+    retVal << ", \n";
+
+    netid.set(2, 0);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    netid.set(2, (1 << 9) - 1);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    
+    netid.set(3, 0);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    netid.set(3, (1 << 21) - 1);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    
+    netid.set(4, 0);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    netid.set(4, (1 << 21) - 1);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    
+    netid.set(5, 0);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    netid.set(5, (1 << 21) - 1);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    
+    netid.set(6, 0);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    netid.set(6, (1 << 21) - 1);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    
+    netid.set(7, 0);
+    printClass(retVal, netid);
+    retVal << ", \n";
+    netid.set(7, (1 << 21) - 1);
+    printClass(retVal, netid);
+    retVal << "]";
+}
+
 static bool fetchJson(
     std::ostream &retVal,
 	struct MHD_Connection *connection,
@@ -280,7 +409,10 @@ static bool fetchJson(
                             if (f == "version")
                                 jsVersion(retVal);
                             else
-                                retVal << "{}";
+                                if (f == "classes")
+                                    jsAllClasses(retVal);
+                                else
+                                    retVal << "{}";
         }
             break;
     }
