@@ -52,8 +52,8 @@ docker rm $(docker ps -qa --no-trunc --filter "status=exited")
 
 ```
 cd /home/andrei/src/ws-lora/build
-sudo chown andrei:andrei ws-lora
-strip ws-lora
+sudo chown andrei:andrei lora-ws
+strip lora-ws
 scp lora-ws andrei@lora.commandus.com:~/lora/
 ```
 
@@ -113,4 +113,4 @@ wget -q -S -O - --post-data '["rfm", "4030034501807b000239058672800d394af6863bf9
 {"mhdr": {"mtype": "unconfirmed-data-up", "major": 0, "rfu": 0}, "addr": "30034501", 
 "fctrl": {"foptslen": 0, "classB": false, "addrackreq": false, "ack": false, "adr": true},
 "fcnt": 31488, "fport": 2, "payload": "39058672800d394af6863bf99148f63bec91543c086c171be37f3953"} 
-```
+``` 

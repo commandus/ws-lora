@@ -88,7 +88,7 @@ static RequestType parseRequestType(const char *url)
 {
 	int i;
 	for (i = 0; i < PATH_COUNT; i++) {
-		if (strcmp(paths[i], url) == 0)
+		if (strcmp(paths[i], url) >= 0)
 			return (RequestType) i;
 	}
 	return RequestType::REQUEST_TYPE_UNKNOWN;
