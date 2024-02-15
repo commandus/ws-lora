@@ -179,6 +179,34 @@ static void jsNetId(
     retVal << "}";
 }
 
+
+static void jsAddrs(
+    std::ostream &retVal,
+    uint8_t &netTypeId,
+    uint32_t &nwkId
+) {
+    DEVADDR minAddr(netTypeId, nwkId, 0);
+    NETID nid(minAddr.getNwkId());
+    DEVADDR maxAddr(nid, true);
+    
+    retVal << "{\"addr\": \"" << DEVADDR2string(minAddr)
+        << "\", \"netid\": \"" << nid.toString()
+        << "\", \"type\": \"" << std::hex << (int) nid.getType()
+        << "\", \"id\": \"" << std::hex << nid.getNetId()
+        << "\", \"nwkId\": \"" << std::hex << nid.getNwkId()
+        << "\", " << std::dec;
+    addrBitExplanation(retVal, minAddr);
+    retVal
+        << std::hex << ", \"addrMin\": \"" << minAddr.toString()
+        << "\", " << std::dec;
+    addrBitExplanation(retVal, minAddr, "min");
+    retVal
+        << std::hex << ", \"addrMax\": \"" << maxAddr.toString()
+        << "\", " << std::dec;
+    addrBitExplanation(retVal, maxAddr, "max");
+    retVal << "}";
+}
+
 static void jsGw(
     std::ostream &retVal,
     const std::string &value
@@ -367,22 +395,17 @@ static bool fetchJson(
                 string2DEVADDR(a, params[1].s);
                 jsNetId(retVal, a);
             } else
-                if (f == "rfm") {
-                    if (params.size() < 2) {
+                if (f == "addrs") {
+                    if (params.size() < 3) {
                         jsInvalidParametersCount(retVal, params);
                         return true;
                     }
-                    bool isBase64 = false;
-                    if (params.size() > 2)
-                        isBase64 = params[2].b;
-                    std::string s;
-                    if (isBase64)
-                        s = base64_decode(params[1].s, true);
-                    else
-                        s = hex2string(params[1].s);
-                    jsRfm(retVal, s);
+                    uint8_t typ = (uint8_t) params[1].i;
+                    uint32_t nwkId = strtoul(params[2].s.c_str(), nullptr, 16);
+                    // extract the network identifier from the address
+                    jsAddrs(retVal, typ, nwkId);
                 } else
-                    if (f == "gw") {
+                    if (f == "rfm") {
                         if (params.size() < 2) {
                             jsInvalidParametersCount(retVal, params);
                             return true;
@@ -395,24 +418,39 @@ static bool fetchJson(
                             s = base64_decode(params[1].s, true);
                         else
                             s = hex2string(params[1].s);
-                        jsGw(retVal, s);
+                        jsRfm(retVal, s);
                     } else
-                        if (f == "keygen") {
-                            if (params.size() < 3) {
+                        if (f == "gw") {
+                            if (params.size() < 2) {
                                 jsInvalidParametersCount(retVal, params);
                                 return true;
                             }
-                            DEVADDR a;
-                            string2DEVADDR(a, params[1].s);
-                            jsKeyGen(retVal, params[1].s, a);
-                        } else
-                            if (f == "version")
-                                jsVersion(retVal);
+                            bool isBase64 = false;
+                            if (params.size() > 2)
+                                isBase64 = params[2].b;
+                            std::string s;
+                            if (isBase64)
+                                s = base64_decode(params[1].s, true);
                             else
-                                if (f == "classes")
-                                    jsAllClasses(retVal);
+                                s = hex2string(params[1].s);
+                            jsGw(retVal, s);
+                        } else
+                            if (f == "keygen") {
+                                if (params.size() < 3) {
+                                    jsInvalidParametersCount(retVal, params);
+                                    return true;
+                                }
+                                DEVADDR a;
+                                string2DEVADDR(a, params[1].s);
+                                jsKeyGen(retVal, params[1].s, a);
+                            } else
+                                if (f == "version")
+                                    jsVersion(retVal);
                                 else
-                                    retVal << "{}";
+                                    if (f == "classes")
+                                        jsAllClasses(retVal);
+                                    else
+                                        retVal << "{}";
         }
             break;
     }
