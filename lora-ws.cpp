@@ -163,8 +163,8 @@ static void jsNetId(
 
     retVal << "{\"addr\": \"" << DEVADDR2string(addr)
         << "\", \"netid\": \"" << nid.toString()
-        << "\", \"type\": \"" << std::hex << (int) nid.getType()
-        << "\", \"id\": \"" << std::hex << nid.getNetId()
+        << "\", \"type\": " << (int) nid.getType()
+        << ", \"id\": \"" << std::hex << nid.getNetId()
         << "\", \"nwkId\": \"" << std::hex << nid.getNwkId()
         << "\", " << std::dec;
     addrBitExplanation(retVal, addr);
@@ -179,20 +179,19 @@ static void jsNetId(
     retVal << "}";
 }
 
-
 static void jsAddrs(
     std::ostream &retVal,
     uint8_t &netTypeId,
     uint32_t &nwkId
 ) {
     DEVADDR minAddr(netTypeId, nwkId, 0);
-    NETID nid(minAddr.getNwkId());
+    NETID nid(minAddr.getNetIdType(), minAddr.getNwkId());
     DEVADDR maxAddr(nid, true);
     
     retVal << "{\"addr\": \"" << DEVADDR2string(minAddr)
         << "\", \"netid\": \"" << nid.toString()
-        << "\", \"type\": \"" << std::hex << (int) nid.getType()
-        << "\", \"id\": \"" << std::hex << nid.getNetId()
+        << "\", \"type\": " << (int) nid.getType()  // << "\", \"type\": " << (int) minAddr.getNetIdType()
+        << ", \"id\": \"" << std::hex << nid.getNetId()
         << "\", \"nwkId\": \"" << std::hex << nid.getNwkId()
         << "\", " << std::dec;
     addrBitExplanation(retVal, minAddr);
@@ -287,8 +286,8 @@ static void printClass
     DEVADDR maxAddr(netid, true);
     retVal
         << "{\"netid\": \"" << netid.toString()
-        << "\", \"type\": \"" << std::hex << (int) netid.getType()
-        << "\", \"id\": \"" << netid.getNetId()
+        << "\", \"type\": " << (int) netid.getType()
+        << ", \"id\": \"" << netid.getNetId()
         << "\", \"nwkid\": \"" << netid.getNwkId()
         << "\", \"addrmin\": \"" << minAddr.toString()
         << "\", " << std::dec;
@@ -401,7 +400,12 @@ static bool fetchJson(
                         return true;
                     }
                     uint8_t typ = (uint8_t) params[1].i;
-                    uint32_t nwkId = strtoul(params[2].s.c_str(), nullptr, 16);
+                    uint32_t nwkId = 0;
+                    if (params[2].t == QUERY_PARAM_INT)
+                        nwkId = params[2].i;
+                    else
+                        nwkId = strtoul(params[2].s.c_str(), nullptr, 16);
+
                     // extract the network identifier from the address
                     jsAddrs(retVal, typ, nwkId);
                 } else
