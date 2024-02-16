@@ -157,7 +157,7 @@ static void jsNetId(
     std::ostream &retVal,
     const DEVADDR &addr
 ) {
-    NETID nid(addr.getNwkId());
+    NETID nid(addr.getNetIdType(), addr.getNwkId());
     DEVADDR minAddr(nid, false);
     DEVADDR maxAddr(nid, true);
 
@@ -280,88 +280,77 @@ static void jsKeyGen(
 static void printClass
 (
     std::ostream &retVal,
-    const NETID &netid
+    const NETID &netid1,
+    const NETID &netid2
 ) {
-    DEVADDR minAddr(netid, false);
-    DEVADDR maxAddr(netid, true);
+    DEVADDR minAddr1(netid1, false);
+    DEVADDR maxAddr1(netid1, true);
+    DEVADDR minAddr2(netid2, false);
+    DEVADDR maxAddr2(netid2, true);
+    uint8_t typ = minAddr1.getNetIdType();
+    uint8_t prefixLen = DEVADDR::getTypePrefixBitsCount(typ);
+    uint8_t nwkIdLen = DEVADDR::getNwkIdBitsCount(typ);
+    uint8_t nwkAddrLen = DEVADDR::getNwkAddrBitsCount(typ);
     retVal
-        << "{\"netid\": \"" << netid.toString()
-        << "\", \"type\": " << (int) netid.getType()
-        << ", \"id\": \"" << netid.getNetId()
-        << "\", \"nwkid\": \"" << netid.getNwkId()
-        << "\", \"addrmin\": \"" << minAddr.toString()
-        << "\", " << std::dec;
-    addrBitExplanation(retVal, minAddr, "min");
-    retVal
-        << std::hex << ", \"addrmax\": \"" << maxAddr.toString()
-        << "\", " << std::dec;
-    addrBitExplanation(retVal, minAddr, "max");
-    retVal
-        << "}";
+        << "{\"type\": " << (int) netid1.getType()
+        << ", \"nwkMin\": \"" << std::hex << netid1.getNwkId()
+        << "\", \"nwkMax\": \"" << netid2.getNwkId()
+        << "\", \"nwkMinAddrMin\": \"" << minAddr1.toString()
+        << "\", \"nwkMinAddrMax\": \"" << maxAddr1.toString()
+        << "\", \"nwkMaxAddrMin\": \"" << minAddr2.toString()
+        << "\", \"nwkMaxAddrMax\": \"" << maxAddr2.toString()
+        << "\", \"prefixlen\": " << std::dec << (int) prefixLen
+        << ", \"" << "nwkidlen\": " << (int) nwkIdLen
+        << ", \"" << "addrlen\": " << (int) nwkAddrLen << "}";
 }
 
 static void jsAllClasses(
     std::ostream &retVal
 ) {
     NETID netid;
+    NETID netid2;
     // print header
     retVal 
         << "[";
         
-    netid.set(0, 0);
-    printClass(retVal, netid);
+    netid.set(0, 0);\
+    netid2.set(0, (1 << 6) - 1);
+    printClass(retVal, netid, netid2);
     retVal << ", \n";
-    netid.set(0, (1 << 6) - 1);
-    printClass(retVal, netid);
-    retVal << ", \n";
-
+    
     netid.set(1, 0);
-    printClass(retVal, netid);
-    retVal << ", \n";
-    netid.set(1, (1 << 6) - 1);
-    printClass(retVal, netid);
+    netid2.set(1, (1 << 6) - 1);
+    printClass(retVal, netid, netid2);
     retVal << ", \n";
 
     netid.set(2, 0);
-    printClass(retVal, netid);
-    retVal << ", \n";
-    netid.set(2, (1 << 9) - 1);
-    printClass(retVal, netid);
+    netid2.set(2, (1 << 9) - 1);
+    printClass(retVal, netid, netid2);
     retVal << ", \n";
     
     netid.set(3, 0);
-    printClass(retVal, netid);
-    retVal << ", \n";
-    netid.set(3, (1 << 21) - 1);
-    printClass(retVal, netid);
+    netid2.set(3, (1 << 21) - 1);
+    printClass(retVal, netid, netid2);
     retVal << ", \n";
     
     netid.set(4, 0);
-    printClass(retVal, netid);
-    retVal << ", \n";
-    netid.set(4, (1 << 21) - 1);
-    printClass(retVal, netid);
+    netid2.set(4, (1 << 21) - 1);
+    printClass(retVal, netid, netid2);
     retVal << ", \n";
     
     netid.set(5, 0);
-    printClass(retVal, netid);
-    retVal << ", \n";
-    netid.set(5, (1 << 21) - 1);
-    printClass(retVal, netid);
+    netid2.set(5, (1 << 21) - 1);
+    printClass(retVal, netid, netid2);
     retVal << ", \n";
     
     netid.set(6, 0);
-    printClass(retVal, netid);
-    retVal << ", \n";
-    netid.set(6, (1 << 21) - 1);
-    printClass(retVal, netid);
+    netid2.set(6, (1 << 21) - 1);
+    printClass(retVal, netid, netid2);
     retVal << ", \n";
     
     netid.set(7, 0);
-    printClass(retVal, netid);
-    retVal << ", \n";
-    netid.set(7, (1 << 21) - 1);
-    printClass(retVal, netid);
+    netid2.set(7, (1 << 21) - 1);
+    printClass(retVal, netid, netid2);
     retVal << "]";
 }
 
