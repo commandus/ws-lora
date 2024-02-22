@@ -253,6 +253,52 @@ std::string JOIN_ACCEPT_FRAME_CFLIST2string(
     return ss.str();
 }
 
+std::string DOWNLINK_STORAGE2String(
+    const DOWNLINK_STORAGE &value,
+    int size
+)
+{
+    std::stringstream ss;
+    int payloadSize = size - SIZE_DOWNLINK_EMPTY_STORAGE;
+    if (payloadSize > 255)
+        payloadSize = 255;
+    else
+        if (payloadSize < 0)
+            payloadSize = 0;
+    ss << "{\"addr\": \"" << DEVADDR2string(value.devaddr)
+        << "\", \"foptslen\": " << (int) value.f.foptslen << ", "
+        << "\", \"fpending\": " << (value.f.fpending ? "true" : "false")
+        << "\", \"ack\": " << (value.f.ack ? "true" : "false")
+        << "\", \"rfu\": " << (int) value.f.rfu
+        << "\", \"adr\": " << (value.f.adr ? "true" : "false")
+        << "\", \"optsNpayload\": \"" << hexString(&value.optsNpayload, payloadSize)
+        << "\"}";
+    return ss.str();
+}
+
+std::string UPLINK_STORAGE2String(
+    const UPLINK_STORAGE &value,
+    int size
+)
+{
+    std::stringstream ss;
+    int payloadSize = size - SIZE_UPLINK_EMPTY_STORAGE;
+    if (payloadSize > 255)
+        payloadSize = 255;
+    else
+    if (payloadSize < 0)
+        payloadSize = 0;
+    ss << "{\"addr\": \"" << DEVADDR2string(value.devaddr)
+       << "\", \"foptslen\": " << (int) value.f.foptslen << ", "
+       << "\", \"classb\": " << (value.f.classb ? "true" : "false")
+       << "\", \"ack\": " << (value.f.ack ? "true" : "false")
+       << "\", \"addrackreq\": " << (int) value.f.addrackreq
+       << "\", \"adr\": " << (value.f.adr ? "true" : "false")
+       << "\", \"optsNpayload\": \"" << hexString(&value.optsNpayload, payloadSize)
+        << "\"}";
+    return ss.str();
+}
+
 std::string NETID2String(
     const NETID &value
 )

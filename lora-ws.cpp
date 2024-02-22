@@ -6,9 +6,11 @@
 #include <microhttpd.h>
 #include <sstream>
 
+#include "base64/base64.h"
+
 #include "lorawan/lorawan-string.h"
 #include "lorawan/key/key128gen.h"
-#include "base64/base64.h"
+#include "lorawan/proto/gw/basic-udp.h"
 
 static const std::string VERSION_STR("1.0");
 
@@ -206,10 +208,64 @@ static void jsAddrs(
     retVal << "}";
 }
 
+static void jsGwPushData(
+    std::ostream &retVal,
+    GwPushData &value
+) {
+    retVal << "{\"rxMetadata\": "
+           << SEMTECH_PROTOCOL_METADATA_RX2string(value.rxMetadata)
+           << ", \"rxData\": " << value.rxData.toString()
+           << "}";
+}
+
 static void jsGw(
     std::ostream &retVal,
-    const std::string &value
+    const std::string &packetForwarderPacket
 ) {
+    size_t size = packetForwarderPacket.size();
+    if (size <= sizeof(SEMTECH_PREFIX)) {   // at least 4 bytes
+        jsInvalidParameterValue(retVal);
+        return;
+    }
+    SEMTECH_PREFIX *p = (SEMTECH_PREFIX *) packetForwarderPacket.c_str();
+    if (p->version != 2) {
+        jsInvalidParameterValue(retVal);
+        return;
+    }
+
+    int r = p->tag;
+
+    switch (p->tag) {
+        case SEMTECH_GW_PUSH_DATA:  // 0 network server responds on PUSH_DATA to acknowledge immediately all the PUSH_DATA packets received
+        {
+            SEMTECH_PREFIX_GW *pGw = (SEMTECH_PREFIX_GW *) packetForwarderPacket.c_str();
+            ntoh_SEMTECH_PREFIX_GW(*pGw);
+            GwPushData gwPushData;
+            TASK_TIME receivedTime = std::chrono::system_clock::now();
+            r = parsePushData(&gwPushData, (char *) packetForwarderPacket.c_str() + SIZE_SEMTECH_PREFIX_GW,
+                size - SIZE_SEMTECH_PREFIX_GW, pGw->mac, receivedTime); // +12 bytes
+        }
+            break;
+        case SEMTECH_GW_PULL_RESP:  // 4
+        {
+            SEMTECH_PREFIX_GW *pGw = (SEMTECH_PREFIX_GW *) packetForwarderPacket.c_str();
+            ntoh_SEMTECH_PREFIX_GW(*pGw);
+            GwPullResp gwPullResp;
+            r = parsePullResp(&gwPullResp, (char *) packetForwarderPacket.c_str() + SIZE_SEMTECH_PREFIX,
+                size - SIZE_SEMTECH_PREFIX, pGw->mac); // +4 bytes
+        }
+            break;
+        case SEMTECH_GW_TX_ACK:     // 5 gateway inform network server about does PULL_RESP data transmission was successful or not
+        {
+            ERR_CODE_TX code;
+            r = parseTxAck(&code, (char *) packetForwarderPacket.c_str() + SIZE_SEMTECH_PREFIX_GW,
+                SIZE_SEMTECH_PREFIX_GW); // +12 bytes
+        }
+            break;
+        default:
+            jsInvalidParameterValue(retVal);
+            return;
+    }
 }
 
 static void jsRfm(
