@@ -40,7 +40,6 @@ add_executable(lora-ws
 	svc.cpp
 	lora-ws.cpp
 	query-parser-json.cpp
-	ws-config.cpp
 	${LORAWAN_SRC}
 	${ARGTABLE}
 	third-party/daemonize.cpp

@@ -27,10 +27,10 @@ public:
 	int port;
 	// last error code
 	int lasterr;
-	// html root
-	const char* dirRoot;
 	// log verbosity
 	int verbosity;
+    // daemon
+    bool daemonize;
 	// web server descriptor
 	void *descriptor;
     //

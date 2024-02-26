@@ -25,10 +25,20 @@ docker tag <ID> lora
 
 #### Build
 
+Install tools & dependencies
+
 ```
 apt install cmake autoconf libtool build-essential gcc g++ unzip cmake git curl wget clang libmicrohttpd-dev
+```
+
+Build
+
+```
+docker run -itv /home/andrei/src:/home/andrei/src lora bash
+
 cd /home/andrei/src/ws-lora
-mkdir build
+mkdir -p build
+cd /home/andrei/src/ws-lora
 cd build
 rm *
 rm -r CMakeFiles/
@@ -50,11 +60,26 @@ docker rm $(docker ps -qa --no-trunc --filter "status=exited")
 
 ## Deploy
 
+Stop service first
+
+```
+pkill lora-ws
+```
+
+Strip and deploy
+
 ```
 cd /home/andrei/src/ws-lora/build
 sudo chown andrei:andrei lora-ws
 strip lora-ws
 scp lora-ws andrei@lora.commandus.com:~/lora/
+```
+
+Run service
+
+```
+cd lora
+./lora-ws -d
 ```
 
 ### Build & deploy web app:

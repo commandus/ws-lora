@@ -5,6 +5,7 @@
 
 #include <microhttpd.h>
 #include <sstream>
+#include <iostream>
 
 #include "base64/base64.h"
 
@@ -34,8 +35,6 @@ static const std::string VERSION_STR("1.0");
 #define	LOG_ERR								3
 #define	LOG_INFO							5
 
-#define MODULE_WS	200
-
 #include "lora-ws.h"
 #include "lorawan/lorawan-conv.h"
 
@@ -63,18 +62,11 @@ static const char *paths[PATH_COUNT] = {
 
 const static char *CT_JSON = "text/javascript;charset=UTF-8";
 const static char *HDR_CORS_ORIGIN = "*";
-const static char *HDR_CORS_CREDENTIALS = "true";
 const static char *HDR_CORS_METHODS = "GET,HEAD,OPTIONS,POST,PUT,DELETE";
 const static char *HDR_CORS_HEADERS = "Authorization, Access-Control-Allow-Headers, Access-Control-Allow-Origin, "
     "Origin, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers";
 
-typedef enum {
-	START_FETCH_JSON_OK = 0,
-	START_FETCH_FILE = 1
-} START_FETCH_DB_RESULT;
-
 const static char *MSG_HTTP_ERROR = "Error";
-const static char *MSG404 = "404 not found";
 const static char *MSG401 = "Unauthorized";
 const static char *MSG501 = "Not implemented";
 
@@ -96,12 +88,17 @@ static RequestType parseRequestType(const char *url)
 	return RequestType::REQUEST_TYPE_UNKNOWN;
 }
 
-void *uri_logger_callback(void *cls, const char *uri)
+void *uri_logger_callback(
+    void *cls,
+    const char *uri
+)
 {
+    auto c = (WSConfig *) cls;
+    if (c->verbosity && (!c->daemonize)) {
+        std::cout << uri << std::endl;
+    }
 	return nullptr;
 }
-
-const char *NULLSTR = "";
 
 static void jsInvalidParametersCount(
     std::ostream &retVal,
@@ -171,11 +168,11 @@ static void jsNetId(
         << "\", " << std::dec;
     addrBitExplanation(retVal, addr);
     retVal
-        << std::hex << ", \"addrMin\": \"" << minAddr.toString()
+        << std::hex << R"(, "addrMin": ")" << minAddr.toString()
         << "\", " << std::dec;
     addrBitExplanation(retVal, minAddr, "min");
     retVal
-        << std::hex << ", \"addrMax\": \"" << maxAddr.toString()
+        << std::hex << R"(, "addrMax": ")" << maxAddr.toString()
         << "\", " << std::dec;
     addrBitExplanation(retVal, maxAddr, "max");
     retVal << "}";
@@ -190,19 +187,19 @@ static void jsAddrs(
     NETID nid(minAddr.getNetIdType(), minAddr.getNwkId());
     DEVADDR maxAddr(nid, true);
     
-    retVal << "{\"addr\": \"" << DEVADDR2string(minAddr)
-        << "\", \"netid\": \"" << nid.toString()
-        << "\", \"type\": " << (int) nid.getType()  // << "\", \"type\": " << (int) minAddr.getNetIdType()
+    retVal << R"({"addr": ")" << DEVADDR2string(minAddr)
+        << R"(", "netid": ")" << nid.toString()
+        << R"(", "type": )" << (int) nid.getType()  // << "\", \"type\": " << (int) minAddr.getNetIdType()
         << ", \"id\": \"" << std::hex << nid.getNetId()
-        << "\", \"nwkId\": \"" << std::hex << nid.getNwkId()
+        << R"(", "nwkId": ")" << std::hex << nid.getNwkId()
         << "\", " << std::dec;
     addrBitExplanation(retVal, minAddr);
     retVal
-        << std::hex << ", \"addrMin\": \"" << minAddr.toString()
+        << std::hex << R"(, "addrMin": ")" << minAddr.toString()
         << "\", " << std::dec;
     addrBitExplanation(retVal, minAddr, "min");
     retVal
-        << std::hex << ", \"addrMax\": \"" << maxAddr.toString()
+        << std::hex << R"(, "addrMax": ")" << maxAddr.toString()
         << "\", " << std::dec;
     addrBitExplanation(retVal, maxAddr, "max");
     retVal << "}";
@@ -213,9 +210,9 @@ static void jsGwPushData(
     GwPushData &value
 ) {
     retVal << "{\"rxMetadata\": "
-           << SEMTECH_PROTOCOL_METADATA_RX2string(value.rxMetadata)
-           << ", \"rxData\": " << value.rxData.toString()
-           << "}";
+       << SEMTECH_PROTOCOL_METADATA_RX2string(value.rxMetadata)
+       << ", \"rxData\": " << value.rxData.toString()
+       << "}";
 }
 
 static void jsGw(
@@ -227,32 +224,41 @@ static void jsGw(
         jsInvalidParameterValue(retVal);
         return;
     }
-    SEMTECH_PREFIX *p = (SEMTECH_PREFIX *) packetForwarderPacket.c_str();
+    auto *p = (SEMTECH_PREFIX *) packetForwarderPacket.c_str();
     if (p->version != 2) {
         jsInvalidParameterValue(retVal);
         return;
     }
 
-    int r = p->tag;
-
+    int r;
     switch (p->tag) {
         case SEMTECH_GW_PUSH_DATA:  // 0 network server responds on PUSH_DATA to acknowledge immediately all the PUSH_DATA packets received
         {
-            SEMTECH_PREFIX_GW *pGw = (SEMTECH_PREFIX_GW *) packetForwarderPacket.c_str();
+            auto *pGw = (SEMTECH_PREFIX_GW *) packetForwarderPacket.c_str();
             ntoh_SEMTECH_PREFIX_GW(*pGw);
             GwPushData gwPushData;
             TASK_TIME receivedTime = std::chrono::system_clock::now();
             r = parsePushData(&gwPushData, (char *) packetForwarderPacket.c_str() + SIZE_SEMTECH_PREFIX_GW,
                 size - SIZE_SEMTECH_PREFIX_GW, pGw->mac, receivedTime); // +12 bytes
+            if (!r)
+                retVal << "{\"metadata\": " << SEMTECH_PROTOCOL_METADATA_RX2string(gwPushData.rxMetadata)
+                    << ", \"pushData\": " << gwPushData.rxData.toString()
+                    << "}";
         }
             break;
         case SEMTECH_GW_PULL_RESP:  // 4
         {
-            SEMTECH_PREFIX_GW *pGw = (SEMTECH_PREFIX_GW *) packetForwarderPacket.c_str();
+            auto *pGw = (SEMTECH_PREFIX_GW *) packetForwarderPacket.c_str();
             ntoh_SEMTECH_PREFIX_GW(*pGw);
             GwPullResp gwPullResp;
             r = parsePullResp(&gwPullResp, (char *) packetForwarderPacket.c_str() + SIZE_SEMTECH_PREFIX,
                 size - SIZE_SEMTECH_PREFIX, pGw->mac); // +4 bytes
+            if (!r)
+                retVal
+                    << "{\"gwId\": \"" << DEVEUI2string(gwPullResp.gwId)
+                    << "\", \"metadata\": " << SEMTECH_PROTOCOL_METADATA_TX2string(gwPullResp.txMetadata)
+                    << ", \"pullData\": " << gwPullResp.txData.toString()
+                    << "}";
         }
             break;
         case SEMTECH_GW_TX_ACK:     // 5 gateway inform network server about does PULL_RESP data transmission was successful or not
@@ -260,6 +266,10 @@ static void jsGw(
             ERR_CODE_TX code;
             r = parseTxAck(&code, (char *) packetForwarderPacket.c_str() + SIZE_SEMTECH_PREFIX_GW,
                 SIZE_SEMTECH_PREFIX_GW); // +12 bytes
+            if (!r)
+                retVal
+                    << "{\"code\": \"" << ERR_CODE_TX2string(code)
+                    << "\"}";
         }
             break;
         default:
@@ -272,7 +282,7 @@ static void jsRfm(
     std::ostream &retVal,
     std::string &value
 ) {
-    RFM_HEADER *rfm = (RFM_HEADER *) value.c_str();
+    auto *rfm = (RFM_HEADER *) value.c_str();
     size_t sz = value.size();
     if (sz < SIZE_RFM_HEADER) {
         jsInvalidParameterValue(retVal);
@@ -280,11 +290,11 @@ static void jsRfm(
     }
     ntoh_RFM_HEADER(rfm);
     retVal
-        << "{\"mhdr\": {\"mtype\": \"" << mtype2string((MTYPE) rfm->macheader.f.mtype)
-        << "\", \"major\": " << (int) rfm->macheader.f.major
+        << R"({"mhdr": {"mtype": ")" << mtype2string((MTYPE) rfm->macheader.f.mtype)
+        << R"(", "major": )" << (int) rfm->macheader.f.major
         << ", \"rfu\": " << (int) rfm->macheader.f.rfu
-        << "}, \"addr\": \"" << DEVADDR2string(rfm->devaddr)
-        << "\", \"fctrl\": {\"foptslen\": "
+        << R"(}, "addr": ")" << DEVADDR2string(rfm->devaddr)
+        << R"(", "fctrl": {"foptslen": )"
         << (unsigned int) rfm->fctrl.f.foptslen;
     if ((rfm->macheader.f.mtype == MTYPE_UNCONFIRMED_DATA_DOWN) || (rfm->macheader.f.mtype == MTYPE_CONFIRMED_DATA_DOWN)) {
         retVal << ", \"pending\": " << ((unsigned int) rfm->fctrl.f.fpending == 0 ? "false": "true");
@@ -298,7 +308,7 @@ static void jsRfm(
         << "}, \"fcnt\": "  << rfm->fcnt;
 
     if (rfm->fctrl.f.foptslen && sz - SIZE_RFM_HEADER > rfm->fctrl.f.foptslen) {
-        retVal << ", \"mac\": \"" << hexString((value.c_str() + SIZE_RFM_HEADER), rfm->fctrl.f.foptslen)
+        retVal << R"(, "mac": ")" << hexString((value.c_str() + SIZE_RFM_HEADER), rfm->fctrl.f.foptslen)
                << "\"";
     }
     if (sz < SIZE_RFM_HEADER + rfm->fctrl.f.foptslen)
@@ -306,7 +316,7 @@ static void jsRfm(
     std::string payload = std::string(value.c_str() + SIZE_RFM_HEADER + rfm->fctrl.f.foptslen + 1,
                                       sz - SIZE_RFM_HEADER - rfm->fctrl.f.foptslen - 1);
     retVal << ", \"fport\": " << (unsigned int) *((uint8_t*) value.c_str() + SIZE_RFM_HEADER + rfm->fctrl.f.foptslen)
-        << ", \"payload\": \"" << hexString(payload)
+        << R"(, "payload": ")" << hexString(payload)
         << "\"}";
 }
 
@@ -326,10 +336,10 @@ static void jsKeyGen(
     keyGen(nwkKey, KEY_NUMBER_NWK, phraseKey, addr);
     KEY128 appKey;
     keyGen(appKey, KEY_NUMBER_APP, phraseKey, addr);
-    retVal << "{\"addr\": \"" << DEVADDR2string(addr)
-        << "\", \"eui\": \"" << DEVEUI2string(eui)
-        << "\", \"nwkKey\": \"" << KEY2string(nwkKey)
-        << "\", \"appKey\": \"" << KEY2string(appKey)
+    retVal << R"({"addr": ")" << DEVADDR2string(addr)
+        << R"(", "eui": ")" << DEVEUI2string(eui)
+        << R"(", "nwkKey": ")" << KEY2string(nwkKey)
+        << R"(", "appKey": ")" << KEY2string(appKey)
         << "\"}";
 }
 
@@ -349,13 +359,13 @@ static void printClass
     uint8_t nwkAddrLen = DEVADDR::getNwkAddrBitsCount(typ);
     retVal
         << "{\"type\": " << (int) netid1.getType()
-        << ", \"nwkMin\": \"" << std::hex << netid1.getNwkId()
-        << "\", \"nwkMax\": \"" << netid2.getNwkId()
-        << "\", \"nwkMinAddrMin\": \"" << minAddr1.toString()
-        << "\", \"nwkMinAddrMax\": \"" << maxAddr1.toString()
-        << "\", \"nwkMaxAddrMin\": \"" << minAddr2.toString()
-        << "\", \"nwkMaxAddrMax\": \"" << maxAddr2.toString()
-        << "\", \"prefixlen\": " << std::dec << (int) prefixLen
+        << R"(, "nwkMin": ")" << std::hex << netid1.getNwkId()
+        << R"(", "nwkMax": ")" << netid2.getNwkId()
+        << R"(", "nwkMinAddrMin": ")" << minAddr1.toString()
+        << R"(", "nwkMinAddrMax": ")" << maxAddr1.toString()
+        << R"(", "nwkMaxAddrMin": ")" << minAddr2.toString()
+        << R"(", "nwkMaxAddrMax": ")" << maxAddr2.toString()
+        << R"(", "prefixlen": )" << std::dec << (int) prefixLen
         << ", \"" << "nwkidlen\": " << (int) nwkIdLen
         << ", \"" << "addrlen\": " << (int) nwkAddrLen << "}";
 }
@@ -412,9 +422,8 @@ static void jsAllClasses(
 
 static bool fetchJson(
     std::ostream &retVal,
-	struct MHD_Connection *connection,
     const WSConfig *config,
-	const RequestContext *env
+    const RequestContext *env
 )
 {
     // grpc::ServerContext svcContext;
@@ -425,7 +434,7 @@ static bool fetchJson(
         default:
         {
             std::vector<QueryParam> params;
-            config->queryParserJson.parse(&params, env->postData);
+            QueryParserJson::parse(&params, env->postData);
             if (params.empty())
                 retVal << "{}";
             const std::string &f = params[0].s;
@@ -444,7 +453,7 @@ static bool fetchJson(
                         jsInvalidParametersCount(retVal, params);
                         return true;
                     }
-                    uint8_t typ = (uint8_t) params[1].i;
+                    auto typ = (uint8_t) params[1].i;
                     uint32_t nwkId = 0;
                     if (params[2].t == QUERY_PARAM_INT)
                         nwkId = params[2].i;
@@ -520,7 +529,7 @@ static MHD_Result putStringVector(
     const char *value
 )
 {
-    std::map<std::string, std::string> *r = (std::map<std::string, std::string> *) retVal;
+    auto *r = (std::map<std::string, std::string> *) retVal;
     r->insert(std::pair<std::string, std::string>(key, value));
     return MHD_YES;
 }
@@ -580,7 +589,7 @@ static MHD_Result request_callback(
         return MHD_YES;
     }
 
-    RequestContext *requestCtx = (RequestContext *) *ptr;
+    auto *requestCtx = (RequestContext *) *ptr;
     if (*upload_data_size != 0) {
         requestCtx->postData += std::string(upload_data, *upload_data_size);
         *upload_data_size = 0;
@@ -596,7 +605,7 @@ static MHD_Result request_callback(
     } else {
         // Service
         std::stringstream json;
-        bool r = fetchJson(json, connection, (WSConfig*) cls, requestCtx);
+        bool r = fetchJson(json, (WSConfig *) cls, requestCtx);
         if (!r) {
             hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
             response = MHD_create_response_from_buffer(strlen(MSG500[r]), (void *) MSG500[r], MHD_RESPMEM_PERSISTENT);
@@ -626,7 +635,7 @@ bool startWS(
 		&request_callback, &config,
 		MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 30,  // 30s timeout
 		MHD_OPTION_THREAD_POOL_SIZE, config.threadCount,
-		MHD_OPTION_URI_LOG_CALLBACK, &uri_logger_callback, nullptr,
+		MHD_OPTION_URI_LOG_CALLBACK, &uri_logger_callback, &config,
 		MHD_OPTION_CONNECTION_LIMIT, config.connectionLimit,
 		MHD_OPTION_END
 	);

@@ -28,7 +28,6 @@
 
 // embedded HTTP service
 #include "lora-ws.h"
-#include "ws-config.h"
 // print version
 #include <microhttpd.h>
 
@@ -43,6 +42,8 @@
 #endif
 
 const char* progname = "lora-ws";
+
+bool stopRequest;
 
 /**
  * Number of threads to run in the thread pool.  Should (roughly) match
@@ -62,25 +63,19 @@ const char* progname = "lora-ws";
 
 typedef void (*TDaemonRunner)();
 
-static ServiceConfig config;		//<	program configuration read from command line
 static WSConfig wsConfig;
 
-bool stopRequest = false;
-bool stopBookingRequest = false;
-
-
-void stopNWait()
+static void stop()
 {
-	stopRequest = true;
-	stopBookingRequest = true;
+    stopRequest = true;
 }
 
-void done()
+static void done()
 {
 	doneWS(wsConfig);
 }
 
-int reslt;
+int rslt;
 
 static void runHttpJson(
     uint16_t port,
@@ -112,11 +107,10 @@ static void runHttpJson(
 }
 
 static void run() {
-    runHttpJson(config.httpJsonPort, config.daemonize);
-	std::string l;
-	while (!config.stopRequest) {
-		sleep(DEF_WAIT);
-	}
+    stopRequest = false;
+    runHttpJson(wsConfig.port, wsConfig.daemonize);
+    while (!stopRequest)
+        sleep(3);
 }
 
 
@@ -129,7 +123,7 @@ static void run() {
 int parseCmd(
 	int argc,
 	char* argv[],
-	ServiceConfig *value
+    WSConfig *value
 )
 {
 	struct arg_str *a_interface = arg_str0("i", "ip4", _("<address>"), _("service IPv4 network interface address. Default 0.0.0.0 (all)"));
@@ -168,30 +162,15 @@ int parseCmd(
 		return 1;
 	}
 
-	if (a_interface->count)
-		value->address = *a_interface->sval;
-	else
-		value->address = DEF_ADDRESS;
 	if (a_port->count)
 		value->port = *a_port->ival;
 	else
-		value->port = DEF_PORT;
+		value->port = 8050;
     value->verbosity = a_verbosity->count;
-
-    value->httpJsonPort = 8050;
-    if (a_http_json_port->count)
-        value->httpJsonPort = *a_http_json_port->ival;
-
 	value->daemonize = a_daemonize->count > 0;
-	arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
 
-#ifdef _MSC_VER
-	char wd[MAX_PATH];
-	GetCurrentDirectoryA(MAX_PATH - 1, wd);
-#else
-	char wd[PATH_MAX];
-	value->path = getcwd(wd, PATH_MAX);
-#endif
+    arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
+
     return 0;
 }
 
@@ -219,9 +198,8 @@ void signalHandler(int signal)
 	switch (signal)
 	{
 	case SIGINT:
-		config.stopRequest = true;
 		std::cerr << _("Interrupted..");
-		stopNWait();
+        stop();
 		done();
 		std::cerr << _("exit") << std::endl;
 		break;
@@ -249,21 +227,21 @@ int main(int argc, char* argv[])
 {
 	// Signal handler
 	setSignalHandler(SIGINT);
-	reslt = 0;
-	if (parseCmd(argc, argv, &config))
+    rslt = 0;
+	if (parseCmd(argc, argv, &wsConfig))
 		exit(CODE_WRONG_OPTIONS);
-	if (config.daemonize) {
+	if (wsConfig.daemonize) {
         char wd[PATH_MAX];
 		std::string currentPath(getcwd(wd, PATH_MAX));
-		if (config.verbosity)
+		if (wsConfig.verbosity)
 			std::cerr << _("Start as daemon, use syslog") << std::endl;
         OPEN_SYSLOG(progname)
         SYSLOG(LOG_ALERT, _("Start as daemon"))
-        Daemonize daemonize(progname, currentPath, run, stopNWait, done);
+        Daemonize daemonize(progname, currentPath, run, stop, done);
 	}
 	else {
 		run();
 		done();
 	}
-	return reslt;
+	return rslt;
 }
