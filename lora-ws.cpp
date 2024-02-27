@@ -242,7 +242,7 @@ static void jsGw(
                 size - SIZE_SEMTECH_PREFIX_GW, pGw->mac, receivedTime); // +12 bytes
             if (!r)
                 retVal << "{\"metadata\": " << SEMTECH_PROTOCOL_METADATA_RX2string(gwPushData.rxMetadata)
-                    << ", \"pushData\": " << gwPushData.rxData.toString()
+                    << ", \"rfm\": " << gwPushData.rxData.toString()
                     << "}";
         }
             break;
@@ -257,7 +257,7 @@ static void jsGw(
                 retVal
                     << "{\"gwId\": \"" << DEVEUI2string(gwPullResp.gwId)
                     << "\", \"metadata\": " << SEMTECH_PROTOCOL_METADATA_TX2string(gwPullResp.txMetadata)
-                    << ", \"pullData\": " << gwPullResp.txData.toString()
+                    << ", \"rfm\": " << gwPullResp.txData.toString()
                     << "}";
         }
             break;
