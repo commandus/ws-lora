@@ -203,10 +203,18 @@ void signalHandler(int signal)
 		done();
 		std::cerr << _("exit") << std::endl;
 		break;
-	default:
-		std::cerr << _("Signal ") << signal << std::endl;
-	}
+	default: {
+        std::stringstream ss;
+        ss << _("Signal ") << signal;
+        if (wsConfig.daemonize) {
+            SYSLOG(LOG_ALERT, ss.str().c_str());
+        } else {
+            std::cerr << ss.str() << std::endl;
+        }
+    }
+    }
 }
+
 #endif
 
 void setSignalHandler(

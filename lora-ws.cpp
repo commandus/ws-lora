@@ -290,8 +290,8 @@ static void jsRfm(
     }
     ntoh_RFM_HEADER(rfm);
     retVal
-        << R"({"mhdr": {"mtype": ")" << mtype2string((MTYPE) rfm->macheader.f.mtype)
-        << R"(", "major": )" << (int) rfm->macheader.f.major
+        << R"({"mhdr": {"mtype": )" << (int) rfm->macheader.f.mtype
+        << R"(, "major": )" << (int) rfm->macheader.f.major
         << ", \"rfu\": " << (int) rfm->macheader.f.rfu
         << R"(}, "addr": ")" << DEVADDR2string(rfm->devaddr)
         << R"(", "fctrl": {"foptslen": )"
