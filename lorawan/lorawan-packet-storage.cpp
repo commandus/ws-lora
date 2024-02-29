@@ -32,7 +32,7 @@ bool decodeBase64ToLORAWAN_MESSAGE_STORAGE(
             sz = sizeof(LORAWAN_MESSAGE_STORAGE) - 2;
         memmove(&retVal.mhdr, s.c_str(), sz);
         retVal.packetSize = (uint16_t) sz;
-    } catch (std::runtime_error e) {
+    } catch (std::runtime_error &e) {
         return false;
     }
     return true;

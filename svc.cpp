@@ -91,9 +91,8 @@ static void runHttpJson(
     wsConfig.port = port;
     if (!startWS(wsConfig)) {
         std::stringstream ss;
-        ss << "Can not start web service errno "
-            << errno << ": " << std::strerror(errno)
-            << ". libmicrohttpd version " << std::hex << MHD_VERSION;
+        ss << _("Can not start web service errno ")
+            << errno << ": " << std::strerror(errno);
 		if (asDaemon) {
 			SYSLOG(LOG_ALERT, ss.str().c_str());
         } else {
@@ -101,7 +100,7 @@ static void runHttpJson(
         }
     } else {
 		if (asDaemon) {
-			SYSLOG(LOG_ALERT, "HTTP service successfully started");
+			SYSLOG(LOG_ALERT, _("HTTP service successfully started"));
 		}
     }
 }
@@ -156,7 +155,6 @@ int parseCmd(
 			arg_print_errors(stderr, a_end, progname);
 		std::cout << _("Usage: ") << progname << std::endl;
 		arg_print_syntax(stdout, argtable, "\n");
-		std::cout << _("rcr GRPC service") << std::endl;
 		arg_print_glossary(stdout, argtable, "  %-25s %s\n");
 		arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
 		return 1;
