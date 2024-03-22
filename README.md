@@ -38,10 +38,8 @@ docker run -itv /home/andrei/src:/home/andrei/src lora bash
 
 cd /home/andrei/src/ws-lora
 mkdir -p build
-cd /home/andrei/src/ws-lora
-cd build
-rm *
-rm -r CMakeFiles/
+cd /home/andrei/src/ws-lora/build
+rm *;rm -r CMakeFiles/
 cmake ..
 make
 ./lora-ws -?
