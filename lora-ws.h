@@ -33,6 +33,7 @@ public:
     bool daemonize;
 	// web server descriptor
 	void *descriptor;
+    std::string pidfile;
     //
     QueryParserJson queryParserJson;
 };

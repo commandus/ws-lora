@@ -126,9 +126,9 @@ int parseCmd(
 )
 {
 	struct arg_str *a_interface = arg_str0("i", "ip4", _("<address>"), _("service IPv4 network interface address. Default 0.0.0.0 (all)"));
-	struct arg_int *a_port = arg_int0("l", "listen", _("<port>"), _("service port. Default 50051"));
 	struct arg_lit *a_daemonize = arg_lit0("d", "daemonize", _("start as daemon/service"));
-    struct arg_int *a_http_json_port = arg_int0("p", "port", "_(<number>)", _("HTTP service port number. Default 8050"));
+    struct arg_str *a_pidfile = arg_str0("p", "pidfile", _("<file>"), _("Check whether a process has created the file pidfile"));
+    struct arg_int *a_port = arg_int0("t", "port", "_(<number>)", _("HTTP service port number. Default 8050"));
 
     wsConfig.threadCount = NUMBER_OF_THREADS;
     wsConfig.connectionLimit = 1024;
@@ -137,7 +137,7 @@ int parseCmd(
 	struct arg_lit *a_help = arg_lit0("h", "help", _("Show this help"));
 	struct arg_end *a_end = arg_end(20);
 
-	void* argtable[] = { a_interface, a_port, a_http_json_port, a_daemonize, a_verbosity, a_help, a_end };
+	void* argtable[] = { a_interface, a_port, a_daemonize, a_pidfile, a_verbosity, a_help, a_end };
 
 	int nerrors;
 
@@ -164,6 +164,10 @@ int parseCmd(
 		value->port = *a_port->ival;
 	else
 		value->port = 8050;
+    if (a_pidfile->count)
+        value->pidfile = *a_pidfile->sval;
+    else
+        value->pidfile = "";
     value->verbosity = a_verbosity->count;
 	value->daemonize = a_daemonize->count > 0;
 
@@ -243,7 +247,7 @@ int main(int argc, char* argv[])
 			std::cerr << _("Start as daemon, use syslog") << std::endl;
         OPEN_SYSLOG(progname)
         SYSLOG(LOG_ALERT, _("Start as daemon"))
-        Daemonize daemonize(progname, currentPath, run, stop, done);
+        Daemonize daemonize(progname, currentPath, run, stop, done, 0, wsConfig.pidfile);
 	}
 	else {
 		run();
