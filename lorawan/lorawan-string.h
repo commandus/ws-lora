@@ -1,6 +1,6 @@
 #include <string>
-#include "lorawan-types.h"
-#include "lorawan-packet-storage.h"
+#include "lorawan/lorawan-types.h"
+#include "lorawan/lorawan-packet-storage.h"
 
 std::string replaceAll(std::string str, const std::string& from, const std::string& to);
 
@@ -24,6 +24,7 @@ std::string hexString(const void *buffer, size_t size);
 std::string hexString(const std::string &data);
 
 std::string hex2string(const std::string &hex);
+std::string toUpperCase(const std::string &value);
 
 std::string DEVICENAME2string(const DEVICENAME &value);
 std::string gatewayId2str(uint64_t value);
@@ -44,6 +45,15 @@ std::string UPLINK_STORAGE2String(const UPLINK_STORAGE &value, int size);
 std::string NETID2String(const NETID &value);
 std::string activation2string(ACTIVATION value);
 std::string MODULATION2String(MODULATION value);
+
+/**
+ * Bandwidth to string
+ * I am not sure for BANDWIDTH_INDEX_7KHZ..BANDWIDTH_INDEX_125KHZ
+ * @see https://github.com/x893/SX1231/blob/master/SX12xxDrivers-2.0.0/src/radio/sx1276-LoRa.c
+ * SignalBw
+ * 0: 7.8kHz, 1: 10.4 kHz, 2: 15.6 kHz, 3: 20.8 kHz, 4: 31.2 kHz,
+ * 5: 41.6 kHz, 6: 62.5 kHz, 7: 125 kHz, 8: 250 kHz, 9: 500 kHz, other: Reserved
+ */
 std::string BANDWIDTH2String(BANDWIDTH value);
 std::string LORAWAN_VERSION2string(LORAWAN_VERSION value);
 std::string deviceclass2string(DEVICECLASS value);
@@ -104,4 +114,26 @@ CODING_RATE string2codingRate(const std::string &value);
 std::string codingRate2string(CODING_RATE codingRate);
 
 std::string SEMTECH_PROTOCOL_METADATA_RX2string(const SEMTECH_PROTOCOL_METADATA_RX &value);
+/**
+ * Return JSON string
+ * @param value
+ * @return JSON string
+ */
 std::string SEMTECH_PROTOCOL_METADATA_TX2string(const SEMTECH_PROTOCOL_METADATA_TX &value);
+
+std::string REGIONAL_PARAMETERS_VERSION2string(
+    REGIONAL_PARAMETERS_VERSION value
+);
+
+REGIONAL_PARAMETERS_VERSION string2REGIONAL_PARAMETERS_VERSION(
+    const std::string &value
+);
+
+std::string file2string(
+    const char *filename
+);
+
+bool string2file(
+    const std::string &filename,
+    const std::string &value
+);

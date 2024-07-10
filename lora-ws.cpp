@@ -12,6 +12,8 @@
 #include "lorawan/lorawan-string.h"
 #include "lorawan/key/key128gen.h"
 #include "lorawan/proto/gw/basic-udp.h"
+#include "lorawan/storage/serialization/urn-helper.h"
+
 
 static const std::string VERSION_STR("1.0");
 
@@ -420,6 +422,32 @@ static void jsAllClasses(
     retVal << "]";
 }
 
+static void jsUrn(
+    std::ostream &retVal,
+    const std::string &join_eui,            // 16 hex digits
+    const std::string &dev_eui,             // 16 hex digits
+    const std::string &profile_id,          // 8 hex digits
+    const std::string &owner_token,
+    const std::string &serial_number,
+    const std::string &proprietary,
+    bool addCheckSum
+)
+{
+    DEVEUI joinEui;
+    string2DEVEUI(joinEui, join_eui);
+    DEVEUI devEui;
+    string2DEVEUI(devEui, dev_eui);
+    PROFILEID profileId(profile_id);
+    std::vector<std::string> extraProprietary;
+    if (!proprietary.empty())
+        extraProprietary.push_back(proprietary);
+
+    std::string r = mkURN(joinEui, devEui, profileId,
+        owner_token, serial_number, &extraProprietary, addCheckSum);
+    retVal << "\"" << r << "\"";
+}
+
+
 static bool fetchJson(
     std::ostream &retVal,
     const WSConfig *config,
@@ -499,7 +527,7 @@ static bool fetchJson(
                                     return true;
                                 }
                                 DEVADDR a;
-                                string2DEVADDR(a, params[1].s);
+                                string2DEVADDR(a, params[2].s);
                                 jsKeyGen(retVal, params[1].s, a);
                             } else
                                 if (f == "version")
@@ -508,7 +536,35 @@ static bool fetchJson(
                                     if (f == "classes")
                                         jsAllClasses(retVal);
                                     else
-                                        retVal << "{}";
+                                        if (f == "urn") {
+                                            if (params.size() < 4) {
+                                                jsInvalidParametersCount(retVal, params);
+                                                return true;
+                                            }
+                                            // join-eui=16 hex digits, dev-eui=16 hex digits, profile-id=8 hex digits
+                                            // owner-token=?, serial-number=?, proprietary=?, 
+                                            // CRC-16 = true:false
+                                            std::string owner_token;
+                                            std::string serial_number;
+                                            std::string proprietary;
+                                            bool crc;
+                                            if (params.size() > 4) {
+                                                owner_token = params[4].s;
+                                                if (params.size() > 5) {
+                                                    serial_number = params[5].s;
+                                                    if (params.size() > 6) {
+                                                        proprietary = params[6].s;
+                                                        if (params.size() > 7) {
+                                                            crc = params[7].b;
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            jsUrn(retVal, params[1].s, params[2].s, params[3].s,
+                                                owner_token, serial_number, proprietary, crc);
+                                        } else
+                                            retVal << "{}";
         }
             break;
     }

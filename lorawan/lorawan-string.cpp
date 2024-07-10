@@ -1,13 +1,22 @@
 #include <cstring>
 #include <iomanip>
 #include <sstream>
+#include <fstream>
+#include <chrono>
 
 #include "lorawan/lorawan-conv.h"
 #include "lorawan/lorawan-string.h"
 #include "lorawan/lorawan-date.h"
 #include "lorawan/lorawan-mac.h"
+#ifdef ENABLE_UNICODE
+#include <unicode/unistr.h>
+#endif
 
 #define DEF_CODING_RATE CRLORA_4_6
+
+#if defined(_MSC_VER) || defined(__MINGW32__)
+#pragma warning(disable: 4996)
+#endif
 
 /**
  * @see https://stackoverflow.com/questions/2896600/how-to-replace-all-occurrences-of-a-character-in-string
@@ -106,6 +115,29 @@ std::string hex2string(const std::string &hex)
     return readHex(ss);
 }
 
+std::string toUpperCase(
+    const std::string &value
+)
+{
+    std::string r;
+#ifdef ENABLE_UNICODE
+    icu::UnicodeString::fromUTF8(value).toUpper().toUTF8String(r);
+#else
+    r = value;
+    for (auto & c: r) {
+        c = std::toupper(c);
+    }
+#endif
+#if defined(_MSC_VER) || defined(__MINGW32__)
+    if (r.empty())
+        CharUpperA((LPSTR)r.c_str());
+#endif
+    if (r.empty())
+        return value;
+    else
+        return r;
+}
+
 std::string DEVICENAME2string(
 	const DEVICENAME &value
 )
@@ -189,7 +221,7 @@ DEVNONCE string2DEVNONCE(
 )
 {
     DEVNONCE r;
-    r.u = strtoul(value.c_str(), nullptr, 16);
+    r.u = (uint16_t) strtoul(value.c_str(), nullptr, 16);
     r.u = NTOH2(r.u);
     return r;
 }
@@ -216,7 +248,6 @@ std::string JOIN_ACCEPT_FRAME2string(
     std::stringstream ss;
     ss << "{\"header\": " << JOIN_ACCEPT_FRAME_HEADER2string(value.hdr)
         << R"(, "mic": ")" << MIC2String(value.mic) << "\"}";
-    return ss.str();
     return ss.str();
 }
 
@@ -642,8 +673,8 @@ void string2DEVADDR(
 		len = sizeof(DEVADDR);
 	memmove(&retVal.u, str.c_str(), len);
 	if (len < sizeof(DEVADDR))
-		memset(&retVal.u + len, 0, sizeof(DEVADDR) - len);
-	*((uint32_t*) &retVal.u) = NTOH4(*((uint32_t*) &retVal.u));
+		memset(&retVal.c + len, 0, sizeof(DEVADDR) - len);
+	retVal.u = NTOH4(retVal.u);
 }
 
 void string2DEVEUI(
@@ -815,7 +846,17 @@ bool string2NETWORKIDENTITY(
 }
 
 const std::string ERR_CODE_TX_STR[] {
-    "NONE", "TOO_LATE", "TOO_EARLY", "FULL", "EMPTY", "COLLISION_PACKET", "COLLISION_BEACON", "TX_FREQ", "TX_POWER", "GPS_UNLOCKED"
+    "NONE",             // 0
+    "TOO_LATE",
+    "TOO_EARLY",
+    "FULL",
+    "EMPTY",
+    "COLLISION_PACKET", // 5
+    "COLLISION_BEACON",
+    "TX_FREQ",
+    "TX_POWER",
+    "GPS_UNLOCKED",
+    "INVALID"           // 10
 };
 
 const std::string& ERR_CODE_TX2string(
@@ -856,9 +897,9 @@ SPREADING_FACTOR string2datr(
     if (p == std::string::npos)
         return DRLORA_SF5;
     std::string s = value.substr(2, p - 2);
-    auto spreadingFactor = static_cast<SPREADING_FACTOR>(atoi(s.c_str()));
+    auto spreadingFactor = static_cast<SPREADING_FACTOR>(strtol(s.c_str(), nullptr, 10));
     s = value.substr(p + 2);
-    int bandwidthValue = atoi(s.c_str());
+    int bandwidthValue = strtol(s.c_str(), nullptr, 10);
     switch (bandwidthValue) {
         case 7:
             bandwidth = BANDWIDTH_INDEX_7KHZ; // 7.8
@@ -906,7 +947,7 @@ std::string datr2string(
     BANDWIDTH bandwidth
 )
 {
-    int bandwidthValue = 125;
+    int bandwidthValue;
     switch (bandwidth) {
         case BANDWIDTH_INDEX_7KHZ:
             bandwidthValue = 7; // 7.8
@@ -991,6 +1032,8 @@ std::string codingRate2string(
 )
 {
     switch (codingRate) {
+        case CRLORA_0FF:
+            return "";
         case CRLORA_4_5:
             return "4/5";
         case CRLORA_4_6:
@@ -1052,4 +1095,62 @@ std::string SEMTECH_PROTOCOL_METADATA_TX2string(
         << ", \"size\": " << value.size
        << "}";
     return ss.str();
+}
+
+std::string REGIONAL_PARAMETERS_VERSION2string(
+    REGIONAL_PARAMETERS_VERSION value
+) {
+    return LORAWAN_VERSION2string(*(LORAWAN_VERSION*) &value);
+}
+
+REGIONAL_PARAMETERS_VERSION string2REGIONAL_PARAMETERS_VERSION(
+    const std::string &value
+) {
+    std::stringstream ss(value);
+    int ma = 1, mi = 0, re = 0;
+    char dot;
+    if (!ss.eof ())
+        ss >> ma;
+    if (!ss.eof ())
+        ss >> dot;
+    if (!ss.eof ())
+        ss >> mi;
+    if (!ss.eof ())
+        ss >> dot;
+    if (!ss.eof ())
+        ss >> re;
+    REGIONAL_PARAMETERS_VERSION r = { (uint8_t) (ma & 3), (uint8_t) (mi & 3), (uint8_t) (re & 0xf) };
+    return r;
+}
+
+static std::string file2string(
+    std::istream &strm
+)
+{
+    if (!strm)
+        return "";
+    return std::string((std::istreambuf_iterator<char>(strm)), std::istreambuf_iterator<char>());
+}
+
+std::string file2string(
+    const char *filename
+)
+{
+    if (!filename)
+        return "";
+    std::ifstream t(filename);
+    return file2string(t);
+}
+
+bool string2file(
+    const std::string &filename,
+    const std::string &value
+)
+{
+    FILE* f = fopen(filename.c_str(), "w");
+    if (!f)
+        return false;
+    fwrite(value.c_str(), value.size(), 1, f);
+    fclose(f);
+    return true;
 }
