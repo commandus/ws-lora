@@ -26,6 +26,8 @@ set(LORAWAN_SRC
 	lorawan/key/key128gen.cpp
 	lorawan/proto/gw/proto-gw-parser.cpp
 	lorawan/proto/gw/basic-udp.cpp
+	lorawan/storage/serialization/urn-helper.cpp
+	lorawan/helper/crc-helper.cpp
 	third-party/system/crypto/aes.c third-party/system/crypto/cmac.c
 )
 
