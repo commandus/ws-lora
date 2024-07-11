@@ -27,6 +27,7 @@ set(LORAWAN_SRC
 	lorawan/proto/gw/proto-gw-parser.cpp
 	lorawan/proto/gw/basic-udp.cpp
 	lorawan/storage/serialization/urn-helper.cpp
+	lorawan/storage/serialization/qr-helper.cpp
 	lorawan/helper/crc-helper.cpp
 	third-party/system/crypto/aes.c third-party/system/crypto/cmac.c
 )
@@ -46,6 +47,7 @@ add_executable(lora-ws
 	${ARGTABLE}
 	third-party/daemonize.cpp
 	third-party/base64/base64.cpp
+	third-party/nayuki/qrcodegen.cpp
 )
 target_link_libraries(lora-ws PRIVATE ${OS_SPECIFIC_LIBS} ${LIBMICROHTTPD})
 target_include_directories(lora-ws PRIVATE "." "third-party" ${VCPKG_INC})

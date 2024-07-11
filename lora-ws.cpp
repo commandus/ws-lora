@@ -39,6 +39,8 @@ static const std::string VERSION_STR("1.0");
 
 #include "lora-ws.h"
 #include "lorawan/lorawan-conv.h"
+#include "nayuki/qrcodegen.hpp"
+#include "lorawan/storage/serialization/qr-helper.h"
 
 #define PATH_COUNT 2
 
@@ -46,6 +48,12 @@ enum class RequestType {
     REQUEST_TYPE_VERSION = 0,
     REQUEST_TYPE_CLAUSE = 1,
     REQUEST_TYPE_UNKNOWN = 100
+};
+
+enum class RET_MIME_TYPE {
+    RET_MIME_TYPE_JSON = 0,
+    RET_MIME_TYPE_SVG = 1,
+    RET_MIME_TYPE_ERROR = 100
 };
 
 class RequestContext {
@@ -63,6 +71,8 @@ static const char *paths[PATH_COUNT] = {
 };
 
 const static char *CT_JSON = "text/javascript;charset=UTF-8";
+const static char *CT_SVG = "image/svg+xml";
+
 const static char *HDR_CORS_ORIGIN = "*";
 const static char *HDR_CORS_METHODS = "GET,HEAD,OPTIONS,POST,PUT,DELETE";
 const static char *HDR_CORS_HEADERS = "Authorization, Access-Control-Allow-Headers, Access-Control-Allow-Origin, "
@@ -72,13 +82,7 @@ const static char *MSG_HTTP_ERROR = "Error";
 const static char *MSG401 = "Unauthorized";
 const static char *MSG501 = "Not implemented";
 
-const static char *MSG500[5] = {
-	"",                                     // 0
-	"Error 1",                              // 1
-	"Error 2",                              // 2
-	"Error 3",                              // 3
-	"Error 4"                               // 4
-};
+const static char *MSG500 = "Internal server error";
 
 static RequestType parseRequestType(const char *url)
 {
@@ -447,8 +451,26 @@ static void jsUrn(
     retVal << "\"" << r << "\"";
 }
 
+static void jsQr(
+    std::ostream &retVal,
+    const std::string &join_eui,            // 16 hex digits
+    const std::string &dev_eui,             // 16 hex digits
+    const std::string &profile_id,          // 8 hex digits
+    const std::string &owner_token,
+    const std::string &serial_number,
+    const std::string &proprietary,
+    bool addCheckSum
+)
+{
+    std::stringstream ss;
+    jsUrn(ss, join_eui, dev_eui,
+        profile_id, owner_token, serial_number, proprietary, addCheckSum);
+    std::string urn = ss.str();
+    const qrcodegen::QrCode qr = qrcodegen::QrCode::encodeText(urn.c_str(), qrcodegen::QrCode::Ecc::LOW);
+    retVal << qrCode2Svg(qr, 1);
+}
 
-static bool fetchJson(
+static RET_MIME_TYPE fetchResponse(
     std::ostream &retVal,
     const WSConfig *config,
     const RequestContext *env
@@ -469,7 +491,7 @@ static bool fetchJson(
             if (f == "netid") {
                 if (params.size() < 2) {
                     jsInvalidParametersCount(retVal, params);
-                    return true;
+                    return RET_MIME_TYPE::RET_MIME_TYPE_ERROR;
                 }
                 // extract the network identifier from the address
                 DEVADDR a;
@@ -479,7 +501,7 @@ static bool fetchJson(
                 if (f == "addrs") {
                     if (params.size() < 3) {
                         jsInvalidParametersCount(retVal, params);
-                        return true;
+                        return RET_MIME_TYPE::RET_MIME_TYPE_ERROR;
                     }
                     auto typ = (uint8_t) params[1].i;
                     uint32_t nwkId = 0;
@@ -494,7 +516,7 @@ static bool fetchJson(
                     if (f == "rfm") {
                         if (params.size() < 2) {
                             jsInvalidParametersCount(retVal, params);
-                            return true;
+                            return RET_MIME_TYPE::RET_MIME_TYPE_ERROR;
                         }
                         bool isBase64 = false;
                         if (params.size() > 2)
@@ -509,7 +531,7 @@ static bool fetchJson(
                         if (f == "gw") {
                             if (params.size() < 2) {
                                 jsInvalidParametersCount(retVal, params);
-                                return true;
+                                return RET_MIME_TYPE::RET_MIME_TYPE_ERROR;
                             }
                             bool isBase64 = false;
                             if (params.size() > 2)
@@ -524,7 +546,7 @@ static bool fetchJson(
                             if (f == "keygen") {
                                 if (params.size() < 3) {
                                     jsInvalidParametersCount(retVal, params);
-                                    return true;
+                                    return RET_MIME_TYPE::RET_MIME_TYPE_ERROR;
                                 }
                                 DEVADDR a;
                                 string2DEVADDR(a, params[2].s);
@@ -536,10 +558,10 @@ static bool fetchJson(
                                     if (f == "classes")
                                         jsAllClasses(retVal);
                                     else
-                                        if (f == "urn") {
+                                        if ((f == "urn") || (f == "qr")) {
                                             if (params.size() < 4) {
                                                 jsInvalidParametersCount(retVal, params);
-                                                return true;
+                                                return RET_MIME_TYPE::RET_MIME_TYPE_ERROR;
                                             }
                                             // join-eui=16 hex digits, dev-eui=16 hex digits, profile-id=8 hex digits
                                             // owner-token=?, serial-number=?, proprietary=?, 
@@ -560,15 +582,20 @@ static bool fetchJson(
                                                     }
                                                 }
                                             }
-
-                                            jsUrn(retVal, params[1].s, params[2].s, params[3].s,
-                                                owner_token, serial_number, proprietary, crc);
+                                            if (f == "urn")
+                                                jsUrn(retVal, params[1].s, params[2].s, params[3].s,
+                                                    owner_token, serial_number, proprietary, crc);
+                                            else {
+                                                jsQr(retVal, params[1].s, params[2].s, params[3].s,
+                                                     owner_token, serial_number, proprietary, crc);
+                                                return RET_MIME_TYPE::RET_MIME_TYPE_SVG;
+                                            }
                                         } else
                                             retVal << "{}";
         }
             break;
     }
-	return true;
+    return RET_MIME_TYPE::RET_MIME_TYPE_JSON;
 }
 
 static void addCORS(MHD_Response *response) {
@@ -637,7 +664,7 @@ static MHD_Result request_callback(
 	}
 
     if (strcmp(method, "OPTIONS") == 0) {
-        response = MHD_create_response_from_buffer(strlen(MSG500[0]), (void *) MSG500[0], MHD_RESPMEM_PERSISTENT);
+        response = MHD_create_response_from_buffer(strlen(MSG500), (void *) MSG500, MHD_RESPMEM_PERSISTENT);
         MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
         addCORS(response);
         MHD_queue_response(connection, MHD_HTTP_OK, response);
@@ -655,23 +682,28 @@ static MHD_Result request_callback(
     requestCtx->requestType = parseRequestType(url);
 
     int hc;
+    RET_MIME_TYPE r = RET_MIME_TYPE::RET_MIME_TYPE_ERROR;
     if (strcmp(method, "DELETE") == 0) {
         hc = MHD_HTTP_NOT_IMPLEMENTED;
         response = MHD_create_response_from_buffer(strlen(MSG501), (void *) MSG501, MHD_RESPMEM_PERSISTENT);
     } else {
         // Service
-        std::stringstream json;
-        bool r = fetchJson(json, (WSConfig *) cls, requestCtx);
-        if (!r) {
+        std::stringstream retString;
+        r = fetchResponse(retString, (WSConfig *) cls, requestCtx);
+        if (r == RET_MIME_TYPE::RET_MIME_TYPE_ERROR) {
             hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
-            response = MHD_create_response_from_buffer(strlen(MSG500[r]), (void *) MSG500[r], MHD_RESPMEM_PERSISTENT);
+            response = MHD_create_response_from_buffer(strlen(MSG500), (void *) MSG500, MHD_RESPMEM_PERSISTENT);
         } else {
             hc = MHD_HTTP_OK;
-            std::string js = json.str();
-            response = MHD_create_response_from_buffer(js.size(), (void *) js.c_str(), MHD_RESPMEM_MUST_COPY);
+            std::string resp = retString.str();
+            response = MHD_create_response_from_buffer(resp.size(), (void *) resp.c_str(), MHD_RESPMEM_MUST_COPY);
         }
     }
-    MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
+
+    if (r == RET_MIME_TYPE::RET_MIME_TYPE_SVG)
+        MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_SVG);
+    else
+        MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
     addCORS(response);
 	ret = MHD_queue_response(connection, hc, response);
 	MHD_destroy_response(response);
