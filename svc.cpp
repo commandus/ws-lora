@@ -9,7 +9,7 @@
 
 #include "daemonize.h"
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #include <WinSock2.h>
 #include <direct.h>
 #define PATH_MAX MAX_PATH
@@ -33,7 +33,7 @@
 
 #include "log.h"
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #include <direct.h>
 #define PATH_MAX MAX_PATH
 #define getcwd _getcwd
@@ -176,7 +176,7 @@ int parseCmd(
     return 0;
 }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 BOOL WINAPI winSignallHandler(DWORD fdwCtrlType)
 {
 	switch (fdwCtrlType) {
@@ -223,7 +223,7 @@ void setSignalHandler(
     int signal
 )
 {
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 	SetConsoleCtrlHandler(winSignallHandler, TRUE);
 #else
 	struct sigaction action;

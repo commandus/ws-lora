@@ -1,9 +1,10 @@
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #define _CRT_SECURE_NO_WARNINGS
 #include <Windows.h>
+#include "strptime.h"
 #endif
 
-#include "lorawan-date.h"
+#include "lorawan/lorawan-date.h"
 
 #include <ctime>
 #include <cstdlib>
@@ -11,7 +12,7 @@
 #include <sstream>
 #include <iomanip>
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #include "strptime.h"
 #else
 #include <sys/time.h>
@@ -39,7 +40,7 @@ static std::string TM2String(
 {
     char dt[64];
     strftime(dt, sizeof(dt), format.c_str(), &value);
-    if (usec == -1)
+    if (usec < 0)
         return std::string(dt);
     std::stringstream ss;
     ss << std::string(dt) << "." << std::setw(6) << std::setfill('0') << usec;
@@ -73,9 +74,9 @@ std::string ltimeString(
  * @return time stamp
  */
 std::string gtimeString(
-        time_t value,
-        int usec,
-        const std::string &format
+    time_t value,
+    int usec,
+    const std::string &format
 ) {
     if (!value)
         value = time(nullptr);
@@ -95,17 +96,17 @@ time_t parseDate(
 	memset(&tmd, 0, sizeof(struct tm));
 
 	time_t r;
-	if ((strptime(v, dateformat0, &tmd) == nullptr) 
-		&& (strptime(v, dateformat1, &tmd) == nullptr)
-		&& (strptime(v, dateformat2, &tmd) == nullptr)
-		)
-		r = strtol(v, nullptr, 0);
-	else
+    if ((strptime(v, dateformat0, &tmd) == nullptr)
+        && (strptime(v, dateformat1, &tmd) == nullptr)
+        && (strptime(v, dateformat2, &tmd) == nullptr)
+    )
+        r = strtol(v, nullptr, 0);
+    else
         r = mktime(&tmd);
-	return r;
+    return r;
 }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 /**
  * @see https://stackoverflow.com/questions/10905892/equivalent-of-gettimeofday-for-windows
  * @param tp
@@ -264,4 +265,35 @@ void incTimeval(
 			}
 		}
 	}
+}
+
+std::string taskTime2string(
+    TASK_TIME time,
+    const bool local
+)
+{
+    std::time_t t = std::chrono::system_clock::to_time_t(time);
+    std::tm *tm;
+    if (local)
+        tm = std::localtime(&t);
+    else
+        tm = std::gmtime(&t);
+    std::stringstream ss;
+
+    ss << std::put_time(tm, dateformat1);
+
+    // add milliseconds
+    auto duration = time.time_since_epoch();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration) - std::chrono::duration_cast<std::chrono::seconds>(duration);
+    ss << "." << std::setw(3) << std::setfill('0') << ms.count();
+
+    return ss.str();
+}
+
+uint32_t tmstAddMS(
+    uint32_t value, // in microseconds
+    uint32_t addValue
+)
+{
+    return value + (addValue * 1000);
 }

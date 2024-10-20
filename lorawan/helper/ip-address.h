@@ -2,7 +2,8 @@
 #define IP_ADDRESS_H
 
 #include <string>
-#ifdef _MSC_VER
+#include <cinttypes>
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #include <WinSock2.h>
 #include <ws2tcpip.h>
 #else
@@ -13,6 +14,7 @@ typedef int SOCKET;
 
 /**
  * Split @param address e.g. ADRESS:PORT to @param retAddress and @param retPort
+ * Helpful to parse command line parameters.
  */
 bool splitAddress(
     std::string &retAddress,
@@ -21,7 +23,7 @@ bool splitAddress(
 );
 
 /**
- * Return IP adress:port
+ * Return IP adress:port text representation
  * @return address string
  */
 std::string sockaddr2string(
@@ -61,6 +63,18 @@ bool string2sockaddr(
 bool sameSocketAddress(
     const struct sockaddr *a,
     const struct sockaddr *b
+);
+
+bool isAddrStringIPv6(
+    const char *hostAddr
+);
+
+bool isIPv6(
+    const struct sockaddr *addr
+);
+
+bool isIP(
+    const struct sockaddr *addr
 );
 
 #endif

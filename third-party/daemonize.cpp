@@ -4,7 +4,7 @@
 #include <csignal>
 #include <iostream>
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 
 #include <windows.h>
 #include <tchar.h>
@@ -67,7 +67,7 @@ Daemonize::~Daemonize()
 {
 }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 
 void statusStartPending()
 {

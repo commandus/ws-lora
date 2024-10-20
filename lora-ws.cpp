@@ -10,7 +10,7 @@
 #include "base64/base64.h"
 
 #include "lorawan/lorawan-string.h"
-#include "lorawan/key/key128gen.h"
+#include "lorawan/helper/key128gen.h"
 #include "lorawan/proto/gw/basic-udp.h"
 #include "lorawan/storage/serialization/urn-helper.h"
 
@@ -299,29 +299,29 @@ static void jsRfm(
         << R"({"mhdr": {"mtype": )" << (int) rfm->macheader.f.mtype
         << R"(, "major": )" << (int) rfm->macheader.f.major
         << ", \"rfu\": " << (int) rfm->macheader.f.rfu
-        << R"(}, "addr": ")" << DEVADDR2string(rfm->devaddr)
+        << R"(}, "addr": ")" << DEVADDR2string(rfm->fhdr.devaddr)
         << R"(", "fctrl": {"foptslen": )"
-        << (unsigned int) rfm->fctrl.f.foptslen;
+        << (unsigned int) rfm->fhdr.fctrl.f.foptslen;
     if ((rfm->macheader.f.mtype == MTYPE_UNCONFIRMED_DATA_DOWN) || (rfm->macheader.f.mtype == MTYPE_CONFIRMED_DATA_DOWN)) {
-        retVal << ", \"pending\": " << ((unsigned int) rfm->fctrl.f.fpending == 0 ? "false": "true");
+        retVal << ", \"pending\": " << ((unsigned int) rfm->fhdr.fctrl.f.fpending == 0 ? "false": "true");
     }
     if ((rfm->macheader.f.mtype == MTYPE_UNCONFIRMED_DATA_UP) || (rfm->macheader.f.mtype == MTYPE_CONFIRMED_DATA_UP)) {
-        retVal << ", \"classB\": " << ((unsigned int) rfm->fctrl.fup.classb == 0 ? "false": "true")
-            << ", \"addrackreq\": " << (rfm->fctrl.fup.addrackreq == 0 ? "false" : "true");
+        retVal << ", \"classB\": " << ((unsigned int) rfm->fhdr.fctrl.fup.classb == 0 ? "false": "true")
+            << ", \"addrackreq\": " << (rfm->fhdr.fctrl.fup.addrackreq == 0 ? "false" : "true");
     }
-    retVal << ", \"ack\": " << ((unsigned int) rfm->fctrl.f.ack == 0 ? "false": "true")
-        << ", \"adr\": " << (rfm->fctrl.f.adr == 0 ? "false" : "true")
-        << "}, \"fcnt\": "  << rfm->fcnt;
+    retVal << ", \"ack\": " << ((unsigned int) rfm->fhdr.fctrl.f.ack == 0 ? "false": "true")
+        << ", \"adr\": " << (rfm->fhdr.fctrl.f.adr == 0 ? "false" : "true")
+        << "}, \"fcnt\": "  << rfm->fhdr.fcnt;
 
-    if (rfm->fctrl.f.foptslen && sz - SIZE_RFM_HEADER > rfm->fctrl.f.foptslen) {
-        retVal << R"(, "mac": ")" << hexString((value.c_str() + SIZE_RFM_HEADER), rfm->fctrl.f.foptslen)
+    if (rfm->fhdr.fctrl.f.foptslen && sz - SIZE_RFM_HEADER > rfm->fhdr.fctrl.f.foptslen) {
+        retVal << R"(, "mac": ")" << hexString((value.c_str() + SIZE_RFM_HEADER), rfm->fhdr.fctrl.f.foptslen)
                << "\"";
     }
-    if (sz < SIZE_RFM_HEADER + rfm->fctrl.f.foptslen)
+    if (sz < SIZE_RFM_HEADER + rfm->fhdr.fctrl.f.foptslen)
         return; // no FPort, no FRMPayload
-    std::string payload = std::string(value.c_str() + SIZE_RFM_HEADER + rfm->fctrl.f.foptslen + 1,
-                                      sz - SIZE_RFM_HEADER - rfm->fctrl.f.foptslen - 1);
-    retVal << ", \"fport\": " << (unsigned int) *((uint8_t*) value.c_str() + SIZE_RFM_HEADER + rfm->fctrl.f.foptslen)
+    std::string payload = std::string(value.c_str() + SIZE_RFM_HEADER + rfm->fhdr.fctrl.f.foptslen + 1,
+        sz - SIZE_RFM_HEADER - rfm->fhdr.fctrl.f.foptslen - 1);
+    retVal << ", \"fport\": " << (unsigned int) *((uint8_t*) value.c_str() + SIZE_RFM_HEADER + rfm->fhdr.fctrl.f.foptslen)
         << R"(, "payload": ")" << hexString(payload)
         << "\"}";
 }
@@ -333,15 +333,15 @@ static void jsKeyGen(
 ) {
     // generate "master key" by the passphrase
     KEY128 phraseKey;
-    phrase2key(phraseKey, masterKey.c_str(), masterKey.size());
+    phrase2key((uint8_t *) &phraseKey.c, masterKey.c_str(), masterKey.size());
 
     // generate EUI
     DEVEUI eui;
-    euiGen(eui, KEY_NUMBER_EUI, phraseKey, addr);
+    euiGen((uint8_t *) &eui.c, KEY_NUMBER_EUI, (uint8_t *) &phraseKey.c, addr.u);
     KEY128 nwkKey;
-    keyGen(nwkKey, KEY_NUMBER_NWK, phraseKey, addr);
+    keyGen((uint8_t *) &nwkKey.c, KEY_NUMBER_NWK, (uint8_t *) &phraseKey.c, addr.u);
     KEY128 appKey;
-    keyGen(appKey, KEY_NUMBER_APP, phraseKey, addr);
+    keyGen((uint8_t *) &appKey.c, KEY_NUMBER_APP, (uint8_t *) &phraseKey.c, addr.u);
     retVal << R"({"addr": ")" << DEVADDR2string(addr)
         << R"(", "eui": ")" << DEVEUI2string(eui)
         << R"(", "nwkKey": ")" << KEY2string(nwkKey)

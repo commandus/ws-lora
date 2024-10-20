@@ -21,15 +21,22 @@ set(LORAWAN_SRC
 	lorawan/lorawan-string.cpp
 	lorawan/lorawan-date.cpp
 	lorawan/lorawan-mac.cpp
+	lorawan/lorawan-mic.cpp
 	lorawan/lorawan-packet-storage.cpp
 	lorawan/lorawan-types.cpp
-	lorawan/key/key128gen.cpp
+	lorawan/lorawan-builder.cpp
+	lorawan/power-dbm.cpp
+	lorawan/helper/aes-helper.cpp
+	lorawan/helper/crc-helper.cpp
+	lorawan/helper/ip-address.cpp
+	lorawan/helper/key128gen.cpp
 	lorawan/proto/gw/proto-gw-parser.cpp
 	lorawan/proto/gw/basic-udp.cpp
+	lorawan/storage/network-identity.cpp
 	lorawan/storage/serialization/urn-helper.cpp
 	lorawan/storage/serialization/qr-helper.cpp
-	lorawan/helper/crc-helper.cpp
 	third-party/system/crypto/aes.c third-party/system/crypto/cmac.c
+	third-party/strptime.cpp
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")

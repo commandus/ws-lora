@@ -1,7 +1,7 @@
 #include "lorawan-mac.h"
 #include <cstring>
 #include <sstream>
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #include <Windows.h>
 #else
 #include <sys/time.h>
@@ -9,7 +9,6 @@
 
 
 #include <iostream>
-#include <iomanip>
 
 #include "lorawan-date.h"
 #include "lorawan-string.h"
@@ -359,7 +358,10 @@ int parseClientSidePtr(
 		PTR_MAC(DEVICEMODE)	// same
 		break;
 	default:
-		return ERR_CODE_MAC_INVALID;
+        if ((uint8_t) *value < 0x80)
+            return ERR_CODE_MAC_INVALID;
+        // 0x80-0xff proprietary MAC commands, 0x0e-0x7f- reserved
+        return ERR_CODE_MAC_UNKNOWN_EXTENSION;
 	}
 	return r;
 }
@@ -445,7 +447,10 @@ int parseServerSidePtr(
 		PTR_MAC(DEVICEMODE)	// same
 		break;
 	default:
-		return ERR_CODE_MAC_INVALID;
+        if ((uint8_t) *value < 0x80)
+		    return ERR_CODE_MAC_INVALID;
+        // 0x80-0xff proprietary MAC commands, 0x0e-0x7f- reserved
+        return ERR_CODE_MAC_UNKNOWN_EXTENSION;
 	}
 	return r;
 }
@@ -1811,36 +1816,36 @@ MacDataDeviceMode::MacDataDeviceMode(
 }
 
 MacPtr::MacPtr(
-	const std::string &parseData,
-	const bool aClientSide
+    const char* parseData,
+    size_t size,
+    const bool aClientSide
 )
-	: clientSide(aClientSide)
+    : clientSide(aClientSide)
 {
-	parse(parseData);
+    parse(parseData, size);
 }
 
 /**
  * Set size, errorcode
  */
 void MacPtr::parse(
-	const std::string &parseData
+	const char* parseData,
+    size_t size
 ) 
 {
 	MAC_COMMAND *m;
 	int r;
-    std::cerr << "MacPtr::parseRX " << hexString(parseData) << std::endl;
-	const char *p = parseData.c_str();
-	size_t sz = parseData.size();
-	while (sz > 0)
-	{
+	const char *p = parseData;
+    mac.clear();
+	while (size > 0) {
 		if (clientSide)
-			r = parseClientSidePtr(&m, p, sz);
+			r = parseClientSidePtr(&m, p, size);
 		else
-			r = parseServerSidePtr(&m, p, sz);
-		if (r < 0)
+			r = parseServerSidePtr(&m, p, size);
+        if (r < 0)
 			break;
-		sz -= r;
-		p += sz;
+		size -= r;
+		p += r;
 		mac.push_back(m);
 	}
 	errorcode = r < 0 ? r : 0;
@@ -1862,10 +1867,10 @@ std::string MacPtr::toJSONString() const
 	std::stringstream ss;
 	ss << "[";
 	bool needComma = false;
-	for (std::vector<MAC_COMMAND* >::const_iterator it(mac.begin()); it != mac.end(); it++ ) {
+	for (auto it : mac) {
 		if (needComma)
 			ss << ", ";
-		ss << "{" << MAC_DATA2JSONString(*(*it), clientSide) << "}";
+		ss << "{" << MAC_DATA2JSONString(*it, clientSide) << "}";
 		needComma = true;
 	}
 	ss << "]";

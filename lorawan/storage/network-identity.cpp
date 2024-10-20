@@ -3,8 +3,7 @@
 
 #include "lorawan/lorawan-types.h"
 #include "lorawan/lorawan-string.h"
-#include "lorawan/lorawan-conv.h"
-#include "network-identity.h"
+#include "lorawan/lorawan-mic.h"
 
 NetworkIdentity::NetworkIdentity() = default;
 
@@ -24,6 +23,19 @@ NetworkIdentity::NetworkIdentity
     : devaddr(0), activation(value.activation), deviceclass(value.deviceclass),
           devEUI(value.devEUI), nwkSKey(value.nwkSKey), appSKey(value.appSKey), name(value.name)
 {
+}
+
+NetworkIdentity& NetworkIdentity::operator=(
+    const DEVICEID& value
+)
+{
+    activation = value.activation;
+    deviceclass = value.deviceclass;
+    devEUI = value.devEUI;
+    nwkSKey = value.nwkSKey;
+    appSKey = value.appSKey;
+    name = value.name;
+    return *this;
 }
 
 std::string NetworkIdentity::toString() const
@@ -70,17 +82,65 @@ void NetworkIdentity::set(
 	const DEVICEID &value
 )
 {
-	memmove(&devaddr.u, &addr, sizeof(DEVADDR));
+	memmove(&devaddr.u, &addr.u, sizeof(DEVADDR));
 	memmove(&activation, &value.activation, sizeof(activation));
 	memmove(&deviceclass, &value.deviceclass, sizeof(deviceclass));
 	memmove(&devEUI, &value.devEUI, sizeof(DEVEUI));
-	memmove(&nwkSKey.c, &value.nwkSKey, sizeof(KEY128));
-	memmove(&appSKey.c, &value.appSKey, sizeof(KEY128));
+	memmove(&nwkSKey.c, &value.nwkSKey.c, sizeof(KEY128));
+	memmove(&appSKey.c, &value.appSKey.c, sizeof(KEY128));
 	memmove(&appEUI, &value.appEUI, sizeof(DEVEUI));
-	memmove(&appKey.c, &value.appKey, sizeof(KEY128));
-	memmove(&nwkKey.c, &value.nwkKey, sizeof(KEY128));
+	memmove(&appKey.c, &value.appKey.c, sizeof(KEY128));
+	memmove(&nwkKey.c, &value.nwkKey.c, sizeof(KEY128));
 	devNonce = value.devNonce;
 	memmove(&joinNonce, &value.joinNonce, sizeof(JOINNONCE));
 	memmove(&name, &value.name, sizeof(DEVICENAME));
 	memmove(&version, &value.version, sizeof(LORAWAN_VERSION));
+}
+
+uint32_t calculateMIC(
+    const void *buf,
+    size_t size,
+    const NetworkIdentity &identity
+)
+{
+    if (!buf || size < SIZE_MHDR)
+        return 0;
+    auto b = (uint8_t*) buf;
+    switch (*((MTYPE*) buf)) {
+        case MTYPE_JOIN_REQUEST:
+            if (size < SIZE_MHDR + SIZE_JOIN_REQUEST_FRAME )
+                return 0;
+            return calculateMICJoinRequest((JOIN_REQUEST_HEADER *) (b + 1), identity.nwkSKey);
+        case MTYPE_REJOIN_REQUEST:
+            if (size < SIZE_MHDR + SIZE_JOIN_REQUEST_FRAME )
+                return 0;
+            {
+                int rejoinType = 0;
+                return calculateMICReJoinRequest((JOIN_REQUEST_HEADER *) (b + 1), identity.nwkSKey, rejoinType);
+            }
+        case MTYPE_JOIN_ACCEPT:
+            if (size < SIZE_MHDR + SIZE_JOIN_ACCEPT_FRAME )
+                return 0;
+            return calculateMICJoinResponse(*(JOIN_ACCEPT_FRAME *) (b + 1), identity.nwkSKey);
+        case MTYPE_UNCONFIRMED_DATA_UP:
+        case MTYPE_CONFIRMED_DATA_UP: {
+            if (size < SIZE_MHDR + SIZE_FHDR )
+                return 0;
+            return calculateMICFrmPayload(b, size,
+                ((FHDR *) (b + 1))->fcnt, 0, identity.devaddr, identity.nwkSKey
+            );
+        }
+        case MTYPE_UNCONFIRMED_DATA_DOWN:
+        case MTYPE_CONFIRMED_DATA_DOWN: {
+            if (size < SIZE_MHDR + SIZE_FHDR )
+                return 0;
+            return calculateMICFrmPayload(b, size,
+                ((FHDR *) (b + 1))->fcnt, 1, identity.devaddr, identity.nwkSKey
+            );
+        }
+        default:
+            // case MTYPE_PROPRIETARYRADIO:
+            break;
+    }
+    return 0;
 }

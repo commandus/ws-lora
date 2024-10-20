@@ -1,4 +1,4 @@
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #define	SYSLOG(level, msg)
 #define OPEN_SYSLOG(NAME)
 #define CLOSE_SYSLOG()

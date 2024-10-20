@@ -766,16 +766,21 @@ class MacDataList {
  * Good for parseRX MAC commands sent by the client
  */
 class MacPtr {
-	protected:
-		void parse(
-			const std::string &parseData
-		);
 	public:
 		std::vector<MAC_COMMAND* > mac;
 		int errorcode;
-		// clientSide: true transmitted by the server client side, falae- MAC command transmitted by end-device (server side) 
+		// clientSide: true- transmitted by the server client side, false- MAC command transmitted by end-device (server side)
 		bool clientSide;
-		MacPtr(const std::string &parseData, const bool clientSide = false);
+
+        void parse(
+            const char* parseData,
+            size_t size
+        );
+        MacPtr(
+            const char* parseData,
+            size_t size,
+            const bool aClientSide = false
+        );
 		std::string toHexString() const;
 		std::string toJSONString() const;
 

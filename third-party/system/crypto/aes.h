@@ -89,7 +89,7 @@ return_type aes_set_key( const uint8_t key[],
 
 #if defined( AES_ENC_PREKEYED )
 
-return_type open_aes_encrypt( const uint8_t in[N_BLOCK],
+return_type aes_encrypt( const uint8_t in[N_BLOCK],
                          uint8_t out[N_BLOCK],
                          const aes_context ctx[1] );
 
@@ -102,7 +102,7 @@ return_type aes_cbc_encrypt( const uint8_t *in,
 
 #if defined( AES_DEC_PREKEYED )
 
-return_type open_aes_decrypt( const uint8_t in[N_BLOCK],
+return_type aes_decrypt( const uint8_t in[N_BLOCK],
                          uint8_t out[N_BLOCK],
                          const aes_context ctx[1] );
 
@@ -119,7 +119,7 @@ return_type aes_cbc_decrypt( const uint8_t *in,
     The encryption subroutines take a key in an array of bytes in
     key[L] where L is 16, 24 or 32 bytes for key lengths of 128,
     192, and 256 bits respectively.  They then encrypts the input
-    data, in[] with this key and put the reult in the output array
+    data, in[] with this key and putUplink the reult in the output array
     out[].  In addition, the second key array, o_key[L], is used
     to output the key that is needed by the decryption subroutine
     to reverse the encryption operation.  The two key arrays can

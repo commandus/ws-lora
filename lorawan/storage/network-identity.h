@@ -31,7 +31,7 @@ public:
 	DEVEUI appEUI;			///< OTAA application identifier
 	KEY128 appKey;			///< OTAA application private key
     KEY128 nwkKey;          ///< OTAA network key
-    DEVNONCE devNonce{};      ///< last device nonce
+    DEVNONCE devNonce{};    ///< last device nonce
 	JOINNONCE joinNonce;    ///< last Join nonce
 	// added for searching
 	DEVICENAME name;
@@ -39,8 +39,15 @@ public:
 	NetworkIdentity(const DEVADDR &a, const DEVICEID &id);
     explicit NetworkIdentity(const DEVICEID &id);
 	void set(const DEVADDR &addr, const DEVICEID &value);
+    NetworkIdentity& operator=(const DEVICEID& other);
 	std::string toString() const;
     std::string toJsonString() const;
 };
+
+uint32_t calculateMIC(
+    const void *data,
+    size_t size,
+    const NetworkIdentity &identity
+);
 
 #endif

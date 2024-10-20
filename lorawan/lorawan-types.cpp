@@ -1334,6 +1334,11 @@ JOINNONCE::JOINNONCE(
     int2JOINNONCE(*this, value);
 }
 
+uint32_t JOINNONCE::get() const
+{
+    return JOINNONCE2int(*this);
+}
+
 APPNONCE::APPNONCE()
 {
     c[0] = 0;
@@ -1884,8 +1889,106 @@ bool PROFILEID::operator>(
 }
 
 bool PROFILEID::operator!=(
-        const PROFILEID &rhs
+    const PROFILEID &rhs
 ) const
 {
     return u != rhs.u;
+}
+
+DataRate::DataRate()
+{
+    value.uplink = true;
+    value.downlink = true;
+    value.modulation = MODULATION_LORA;
+    value.bandwidth = BANDWIDTH_INDEX_125KHZ;
+    value.spreadingFactor = DRLORA_SF11;
+    value.bps = 0;
+}
+
+DataRate::DataRate(
+    const DataRate &val
+)
+{
+    value.uplink = val.value.uplink;
+    value.downlink = val.value.downlink;
+    value.modulation = val.value.modulation;
+    value.bandwidth = val.value.bandwidth;
+    value.spreadingFactor = val.value.spreadingFactor;
+    value.bps = val.value.bps;
+}
+
+DataRate::DataRate(
+    const DATA_RATE &val
+)
+{
+    value.uplink = val.uplink;
+    value.downlink = val.downlink;
+    value.modulation = val.modulation;
+    value.bandwidth = val.bandwidth;
+    value.spreadingFactor = val.spreadingFactor;
+    value.bps = val.bps;
+}
+
+DataRate::DataRate(
+    BANDWIDTH aBandwidth,
+    SPREADING_FACTOR aSpreadingFactor
+)
+{
+    value.uplink = true;
+    value.downlink = true;
+    value.modulation = MODULATION_LORA;
+    value.bandwidth = aBandwidth;
+    value.spreadingFactor = aSpreadingFactor;
+    value.bps = 0;
+}
+
+DataRate::DataRate(
+    uint32_t aBps
+)
+{
+    value.uplink = true;
+    value.downlink = true;
+    value.modulation = MODULATION_FSK;
+    value.bandwidth = BANDWIDTH_INDEX_7KHZ;
+    value.spreadingFactor = DRLORA_SF5;
+    value.bps = aBps;
+}
+
+void DataRate::setLora(
+    BANDWIDTH aBandwidth,
+    SPREADING_FACTOR aSpreadingFactor
+)
+{
+    value.uplink = true;
+    value.downlink = true;
+    value.modulation = MODULATION_LORA;
+    value.bandwidth = aBandwidth;
+    value.spreadingFactor = aSpreadingFactor;
+    value.bps = 0;
+}
+
+void DataRate::setFSK(
+    uint32_t aBps
+)
+{
+    value.uplink = true;
+    value.downlink = true;
+    value.modulation = MODULATION_FSK;
+    value.bandwidth = BANDWIDTH_INDEX_7KHZ;
+    value.spreadingFactor = DRLORA_SF5;
+    value.bps = aBps;
+}
+
+std::string DataRate::toString() const
+{
+    std::stringstream ss;
+    // std::boolalpha
+    ss << "{\"uplink\": " << (value.uplink ? STR_TRUE_FALSE)
+       << ", \"downlink\": " << (value.downlink ? STR_TRUE_FALSE)
+       << ", \"modulation\": \"" << MODULATION2String(value.modulation)
+       << "\", \"bandwidth\": " <<  BANDWIDTH2String(value.bandwidth)
+       << ", \"spreadingFactor\": " << value.spreadingFactor
+       << ", \"bps\": " <<  value.bps
+       << "}";
+    return ss.str();
 }
