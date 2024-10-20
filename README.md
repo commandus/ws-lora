@@ -12,9 +12,17 @@ make
 
 ### Build in docker
 
+
 Install docker
 
-#### Pull image
+```
+sudo apt install docker.io
+```
+
+See also https://stackoverflow.com/questions/48957195/how-to-fix-docker-got-permission-denied-issue
+
+
+#### Pull image of the target
 
 ```
 docker images
@@ -25,17 +33,21 @@ docker tag <ID> lora
 
 #### Build
 
-Install tools & dependencies
+Run shell in the docker
+
+```
+docker run -itv /home/andrei/src:/home/andrei/src lora bash
+```
+
+Install tools & dependencies in the docker shell
 
 ```
 apt install cmake autoconf libtool build-essential gcc g++ unzip cmake git curl wget clang libmicrohttpd-dev
 ```
 
-Build
+Build in the docker shell
 
 ```
-docker run -itv /home/andrei/src:/home/andrei/src lora bash
-
 cd /home/andrei/src/ws-lora
 mkdir -p build
 cd /home/andrei/src/ws-lora/build
@@ -43,6 +55,13 @@ rm *;rm -r CMakeFiles/
 cmake ..
 make
 ./lora-ws -?
+```
+
+Strip binary
+
+```
+strip lora-ws
+
 ```
 
 #### Commit
@@ -58,6 +77,11 @@ docker rm $(docker ps -qa --no-trunc --filter "status=exited")
 
 ## Deploy
 
+Login into remote system.
+```
+ssh lora.acme.com
+```
+
 Stop service first
 
 ```
@@ -70,7 +94,7 @@ Strip and deploy
 cd /home/andrei/src/ws-lora/build
 sudo chown andrei:andrei lora-ws
 strip lora-ws
-scp lora-ws andrei@lora.commandus.com:~/lora/
+scp lora-ws andrei@lora.acme.com:~/lora/
 ```
 
 Run service
