@@ -485,8 +485,10 @@ static RET_MIME_TYPE fetchResponse(
         {
             std::vector<QueryParam> params;
             QueryParserJson::parse(&params, env->postData);
-            if (params.empty())
+            if (params.empty()) {
                 retVal << "{}";
+                return RET_MIME_TYPE::RET_MIME_TYPE_JSON;
+            }
             const std::string &f = params[0].s;
             if (f == "netid") {
                 if (params.size() < 2) {

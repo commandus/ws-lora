@@ -10,13 +10,12 @@ public:
     QueryParam& next() {
         QueryParam p;
         params->emplace_back(p);
-        return *(params->end() - 2);
+        return *(params->end() - 1);
     }
 
     explicit SaxQuery(std::vector <QueryParam> *aParams)
         : parseError(0), params(aParams)
     {
-        next();
     }
 
     bool null() override {
@@ -95,6 +94,5 @@ int QueryParserJson::parse(
 ) {
     SaxQuery consumer(params);
     nlohmann::json::sax_parse(json, &consumer);
-    params->resize(params->size() - 1);
     return consumer.parseError;
 }
