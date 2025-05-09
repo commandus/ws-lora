@@ -131,8 +131,7 @@ static std::string addr2bin(
 )
 {
     std::stringstream r;
-    r
-        << std::bitset<8>{value.c[3]}.to_string()
+    r << std::bitset<8>{value.c[3]}.to_string()
         << std::bitset<8>{value.c[2]}.to_string()
         << std::bitset<8>{value.c[1]}.to_string()
         << std::bitset<8>{value.c[0]}.to_string();
@@ -320,9 +319,10 @@ static void jsRfm(
     if (sz < SIZE_RFM_HEADER + rfm->fhdr.fctrl.f.foptslen)
         return; // no FPort, no FRMPayload
     std::string payload = std::string(value.c_str() + SIZE_RFM_HEADER + rfm->fhdr.fctrl.f.foptslen + 1,
-        sz - SIZE_RFM_HEADER - rfm->fhdr.fctrl.f.foptslen - 1);
+        sz - SIZE_RFM_HEADER - rfm->fhdr.fctrl.f.foptslen - 1 - 4); // except MIC
     retVal << ", \"fport\": " << (unsigned int) *((uint8_t*) value.c_str() + SIZE_RFM_HEADER + rfm->fhdr.fctrl.f.foptslen)
         << R"(, "payload": ")" << hexString(payload)
+        << "\", \"mic\": \"" << std::hex << std::setw(8) << std::setfill('0') << NTOH4(*((uint32_t *) ((uint8_t *) value.c_str() + value.size() - 4)))
         << "\"}";
 }
 
