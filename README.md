@@ -182,12 +182,21 @@ Use CLion or other IDE to build cmake
 
 ### Visual studio
 
+Set CMAKE_TOOLCHAIN_FILE and VCPKG_TARGET_TRIPLET in CMake settings, CMake options:
+
 ```
+-DCMAKE_TOOLCHAIN_FILE=C:\git\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+```
+
+or in command line
+
 mkdir build
 cd build
 cmake ..
 cmake .. -DCMAKE_TOOLCHAIN_FILE=C:\git\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
 ```
+
+Use Visual Studio compiler instead of MinGW
 
 Then open solution in the Visual Studio and build.
 
